@@ -37,7 +37,9 @@ contract ContractTest is Test {
     /// correctness tests
     /// -----------------------------------------------------------------------
 
-    // TODO: emit event on creation?
+    /// -----------------------------------------------------------------------
+    /// basic tests
+    /// -----------------------------------------------------------------------
 
     function testCan_receiveETH() public {
         address(wm).safeTransferETH(1 ether);
@@ -56,6 +58,13 @@ contract ContractTest is Test {
 
         // TODO: check event
         assertEq(address(0).balance, 0 ether);
+    }
+
+    function testCan_waterfallETHPayable() public {
+        wm.waterfallFunds{value: 2 ether}();
+
+        assertEq(address(0).balance, 1 ether);
+        assertEq(address(1).balance, 1 ether);
     }
 
     function testCan_waterfallETHToFirstRecipient() public {
@@ -110,4 +119,8 @@ contract ContractTest is Test {
         assertEq(address(0).balance, 1 ether);
         assertEq(address(1).balance, 99 ether);
     }
+
+    /// -----------------------------------------------------------------------
+    /// fuzz tests
+    /// -----------------------------------------------------------------------
 }
