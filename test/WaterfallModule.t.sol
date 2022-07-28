@@ -6,12 +6,22 @@ import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 
 import {WaterfallModule} from "../src/WaterfallModule.sol";
 
+// TODO: add erc20 testing
+// TODO: add recovery testing
+
 contract ContractTest is Test {
     using SafeTransferLib for address;
 
-    WaterfallModule wm;
+    event CreateWaterfallModule(
+        address indexed waterfallModule,
+        address token,
+        address[] trancheRecipient,
+        uint256[] trancheThreshold
+    );
 
     event ReceiveETH(uint256 amount);
+
+    WaterfallModule wm;
 
     function setUp() public {
         uint256 _trancheRecipientLength = 2;
@@ -26,7 +36,8 @@ contract ContractTest is Test {
         for (uint256 i = 0; i < _trancheThresholdLength; i++) {
             _trancheThreshold[i] = (i + 1) * 1 ether;
         }
-        wm = new WaterfallModule(_trancheRecipient, _trancheThreshold);
+        wm =
+            new WaterfallModule(address(0), _trancheRecipient, _trancheThreshold);
     }
 
     /// -----------------------------------------------------------------------
@@ -40,6 +51,29 @@ contract ContractTest is Test {
     /// -----------------------------------------------------------------------
     /// basic tests
     /// -----------------------------------------------------------------------
+
+    function testCan_emitOnCreate() public {
+        uint256 _trancheRecipientLength = 2;
+        address[] memory _trancheRecipient =
+            new address[](_trancheRecipientLength);
+        for (uint256 i = 0; i < _trancheRecipientLength; i++) {
+            _trancheRecipient[i] = address(uint160(i));
+        }
+        uint256 _trancheThresholdLength = _trancheRecipientLength - 1;
+        uint256[] memory _trancheThreshold =
+            new uint256[](_trancheThresholdLength);
+        for (uint256 i = 0; i < _trancheThresholdLength; i++) {
+            _trancheThreshold[i] = (i + 1) * 1 ether;
+        }
+
+        vm.expectEmit(false, true, true, true);
+        emit CreateWaterfallModule(
+            address(this), address(0), _trancheRecipient, _trancheThreshold
+            );
+
+        wm =
+            new WaterfallModule(address(0), _trancheRecipient, _trancheThreshold);
+    }
 
     function testCan_receiveETH() public {
         address(wm).safeTransferETH(1 ether);

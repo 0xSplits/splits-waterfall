@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.15;
 
+import {ERC20} from "solmate/tokens/ERC20.sol";
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 
-// TODO: add erc20 support / prevent locking
-// TODO: prevent non-target fund locking
-// allow anyone to withdraw non-target erc20s (or eth) to ~any recipient
-// TODO: ? add create2 support
 // TODO: clones-with-immutable-args
 // TODO: natspec
 
@@ -28,16 +25,24 @@ error InvalidWaterfall__ZeroThreshold();
 /// @param index Index of out-of-order threshold
 error InvalidWaterfall__ThresholdOutOfOrder(uint256 index);
 
+/// Invalid token recovery nonTargetToken
+error InvalidTokenRecovery_InvalidNonTargetToken();
+
+/// Invalid token recovery beneficiary
+error InvalidTokenRecovery_InvalidBeneficiary();
+
 /// @title WaterfallModule
 /// @author 0xSplits <will@0xSplits.xyz>
 /// @notice TODO
 /// @dev TODO
+/// This contract uses token = address(0) to refer to ETH.
 contract WaterfallModule {
     /// -----------------------------------------------------------------------
     /// libraries
     /// -----------------------------------------------------------------------
 
     using SafeTransferLib for address;
+    using SafeTransferLib for ERC20;
 
     /// -----------------------------------------------------------------------
     /// types
@@ -49,6 +54,18 @@ contract WaterfallModule {
     /// -----------------------------------------------------------------------
     /// events
     /// -----------------------------------------------------------------------
+
+    /// New waterfall module deployed
+    /// @param waterfallModule Address of newly created WaterfallModule clone
+    /// @param token x
+    /// @param trancheRecipient x
+    /// @param trancheThreshold x
+    event CreateWaterfallModule(
+        address indexed waterfallModule,
+        address token,
+        address[] trancheRecipient,
+        uint256[] trancheThreshold
+    );
 
     /// Emitted after each successful ETH transfer to proxy
     /// @param amount Amount of ETH received
@@ -66,7 +83,8 @@ contract WaterfallModule {
     // TODO: private?
     uint256 public immutable finalTranche;
 
-    uint256 public distributedETH;
+    address public immutable token;
+    uint256 public distributedFunds;
     // TODO: private?
     uint256 public activeTranche;
 
@@ -75,9 +93,12 @@ contract WaterfallModule {
     /// -----------------------------------------------------------------------
 
     constructor(
+        address _token,
         address[] memory _trancheRecipient,
         uint256[] memory _trancheThreshold
     ) {
+        token = _token;
+
         // cache lengths in memory
         uint256 _trancheRecipientLength = _trancheRecipient.length;
         uint256 _trancheThresholdLength = _trancheThreshold.length;
@@ -121,7 +142,9 @@ contract WaterfallModule {
         // recipients array is one longer than thresholds array; set last item after loop
         trancheRecipient[i] = _trancheRecipient[i];
 
-        // TODO: event
+        emit CreateWaterfallModule(
+            address(this), _token, _trancheRecipient, _trancheThreshold
+            );
     }
 
     /// -----------------------------------------------------------------------
@@ -141,27 +164,26 @@ contract WaterfallModule {
     function waterfallFunds() external payable {
         /// checks
 
-        // TODO: add w erc20 support
-
         /// effects
 
         // load storage into memory
 
-        uint256 _startingDistributedETH = distributedETH;
+        uint256 _startingDistributedFunds = distributedFunds;
         // TODO: test against re-entrancy
         // distributed eth will have increased but address.balance may still be positive
         // think not: og call will revert
-        uint256 _distributedETH;
+        uint256 _distributedFunds;
         unchecked {
             // shouldn't overflow
-            _distributedETH = _startingDistributedETH + address(this).balance;
+            _distributedFunds =
+                _startingDistributedFunds + address(this).balance;
         }
 
         uint256 _startingActiveTranche = activeTranche;
         uint256 _activeTranche = _startingActiveTranche;
 
         for (; _activeTranche < finalTranche;) {
-            if (trancheThreshold[_activeTranche] >= _distributedETH) {
+            if (trancheThreshold[_activeTranche] >= _distributedFunds) {
                 break;
             }
             unchecked {
@@ -178,7 +200,7 @@ contract WaterfallModule {
         address[] memory _payoutAddresses = new address[](_payoutsLength);
         uint256[] memory _payouts = new uint256[](_payoutsLength);
 
-        uint256 _paidOut = _startingDistributedETH;
+        uint256 _paidOut = _startingDistributedFunds;
         uint256 _trancheIndex;
         uint256 _trancheThreshold;
         uint256 i = 0;
@@ -209,26 +231,69 @@ contract WaterfallModule {
             _trancheIndex = _startingActiveTranche + i;
 
             _payoutAddresses[i] = trancheRecipient[_trancheIndex];
-            // _paidOut = last tranche threshold, which should be <= _distributedETH by construction
-            _payouts[i] = _distributedETH - _paidOut;
+            // _paidOut = last tranche threshold, which should be <= _distributedFunds by construction
+            _payouts[i] = _distributedFunds - _paidOut;
 
-            distributedETH = _distributedETH;
-            // if total amount of distributed ETH is equal to the last tranche threshold, advance
+            distributedFunds = _distributedFunds;
+            // if total amount of distributed funds is equal to the last tranche threshold, advance
             // the active tranche by one
             // shouldn't overflow
             activeTranche =
-                _activeTranche + (_trancheThreshold == _distributedETH ? 1 : 0);
+                _activeTranche + (_trancheThreshold == _distributedFunds ? 1 : 0);
         }
 
         /// interactions
 
         // pay outs
         for (i = 0; i < _payoutsLength;) {
-            (_payoutAddresses[i]).safeTransferETH(_payouts[i]);
+            if (token == address(0)) {
+                (_payoutAddresses[i]).safeTransferETH(_payouts[i]);
+            } else {
+                ERC20(token).safeTransfer(_payoutAddresses[i], _payouts[i]);
+            }
             unchecked {
                 // shouldn't overflow
                 ++i;
             }
+        }
+
+        // TODO: event
+    }
+
+    function recoverNonTargetFunds(address nonTargetToken, address beneficiary)
+        external
+        payable
+    {
+        /// checks
+
+        if (nonTargetToken == token) revert
+            InvalidTokenRecovery_InvalidNonTargetToken();
+
+        bool validBeneficiary = false;
+        for (uint256 i = 0; i < finalTranche;) {
+            if (trancheRecipient[i] == beneficiary) {
+                validBeneficiary = true;
+                break;
+            }
+            unchecked {
+                // shouldn't overflow
+                ++i;
+            }
+        }
+        if (!validBeneficiary) {
+            revert InvalidTokenRecovery_InvalidBeneficiary();
+        }
+
+        /// effects
+
+        /// interactions
+
+        if (nonTargetToken == address(0)) {
+            beneficiary.safeTransferETH(address(this).balance);
+        } else {
+            ERC20(nonTargetToken).safeTransfer(
+                beneficiary, ERC20(nonTargetToken).balanceOf(address(this))
+            );
         }
 
         // TODO: event
