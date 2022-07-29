@@ -7,30 +7,6 @@ import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 // TODO: clones-with-immutable-args
 // TODO: natspec
 
-/// -----------------------------------------------------------------------
-/// errors
-/// -----------------------------------------------------------------------
-
-/// Invalid number of recipients, must have at least 2
-error InvalidWaterfall__TooFewRecipients();
-
-/// Invalid recipient & threshold lengths; recipients must have one more entry
-/// than thresholds
-error InvalidWaterfall__RecipientsAndThresholdLengthMismatch();
-
-/// Thresholds must be positive
-error InvalidWaterfall__ZeroThreshold();
-
-/// Invalid threshold at `index` (thresholds must increase monotonically)
-/// @param index Index of out-of-order threshold
-error InvalidWaterfall__ThresholdOutOfOrder(uint256 index);
-
-/// Invalid token recovery nonTargetToken
-error InvalidTokenRecovery_InvalidNonTargetToken();
-
-/// Invalid token recovery beneficiary
-error InvalidTokenRecovery_InvalidBeneficiary();
-
 /// @title WaterfallModule
 /// @author 0xSplits <will@0xSplits.xyz>
 /// @notice TODO
@@ -52,10 +28,34 @@ contract WaterfallModule {
     /* type Tranche is uint256; */
 
     /// -----------------------------------------------------------------------
+    /// errors
+    /// -----------------------------------------------------------------------
+
+    /// Invalid number of recipients, must have at least 2
+    error InvalidWaterfall__TooFewRecipients();
+
+    /// Invalid recipient & threshold lengths; recipients must have one more entry
+    /// than thresholds
+    error InvalidWaterfall__RecipientsAndThresholdLengthMismatch();
+
+    /// Thresholds must be positive
+    error InvalidWaterfall__ZeroThreshold();
+
+    /// Invalid threshold at `index` (thresholds must increase monotonically)
+    /// @param index Index of out-of-order threshold
+    error InvalidWaterfall__ThresholdOutOfOrder(uint256 index);
+
+    /// Invalid token recovery nonWaterfallToken
+    error InvalidTokenRecovery_WaterfallToken();
+
+    /// Invalid token recovery recipient
+    error InvalidTokenRecovery_InvalidRecipient();
+
+    /// -----------------------------------------------------------------------
     /// events
     /// -----------------------------------------------------------------------
 
-    /// New waterfall module deployed
+    /// Emitted after a new waterfall module is deployed
     /// @param waterfallModule Address of newly created WaterfallModule clone
     /// @param token x
     /// @param trancheRecipient x
@@ -70,6 +70,21 @@ contract WaterfallModule {
     /// Emitted after each successful ETH transfer to proxy
     /// @param amount Amount of ETH received
     event ReceiveETH(uint256 amount);
+
+    /// Emitted after funds are waterfall'd to recipients
+    /// @param recipients x
+    /// @param payouts x
+    event WaterfallFunds(address[] recipients, uint256[] payouts);
+
+    /// Emitted after non-waterfall'd tokens are recovered to a recipient
+    /// @param nonWaterfallToken x
+    /// @param recipient x
+    /// @param amount x
+    event RecoverNonWaterfallFunds(
+        address nonWaterfallToken,
+        address recipient,
+        uint256 amount
+    );
 
     /// -----------------------------------------------------------------------
     /// storage
@@ -175,8 +190,15 @@ contract WaterfallModule {
         uint256 _distributedFunds;
         unchecked {
             // shouldn't overflow
-            _distributedFunds =
-                _startingDistributedFunds + address(this).balance;
+            _distributedFunds = _startingDistributedFunds
+                +
+                // recognizes 0x0 as ETH
+                // shouldn't need to worry about re-entrancy from ERC20 view fn
+                (
+                    token == address(0)
+                        ? address(this).balance
+                        : ERC20(token).balanceOf(address(this))
+                );
         }
 
         uint256 _startingActiveTranche = activeTranche;
@@ -257,22 +279,25 @@ contract WaterfallModule {
             }
         }
 
-        // TODO: event
+        emit WaterfallFunds(_payoutAddresses, _payouts);
     }
 
-    function recoverNonTargetFunds(address nonTargetToken, address beneficiary)
+    function recoverNonWaterfallFunds(
+        address nonWaterfallToken,
+        address recipient
+    )
         external
         payable
     {
         /// checks
 
-        if (nonTargetToken == token) revert
-            InvalidTokenRecovery_InvalidNonTargetToken();
+        if (nonWaterfallToken == token) revert
+            InvalidTokenRecovery_WaterfallToken();
 
-        bool validBeneficiary = false;
-        for (uint256 i = 0; i < finalTranche;) {
-            if (trancheRecipient[i] == beneficiary) {
-                validBeneficiary = true;
+        bool validRecipient = false;
+        for (uint256 i = 0; i <= finalTranche;) {
+            if (trancheRecipient[i] == recipient) {
+                validRecipient = true;
                 break;
             }
             unchecked {
@@ -280,22 +305,23 @@ contract WaterfallModule {
                 ++i;
             }
         }
-        if (!validBeneficiary) {
-            revert InvalidTokenRecovery_InvalidBeneficiary();
+        if (!validRecipient) {
+            revert InvalidTokenRecovery_InvalidRecipient();
         }
 
         /// effects
 
         /// interactions
 
-        if (nonTargetToken == address(0)) {
-            beneficiary.safeTransferETH(address(this).balance);
+        uint256 amount;
+        if (nonWaterfallToken == address(0)) {
+            amount = address(this).balance;
+            recipient.safeTransferETH(amount);
         } else {
-            ERC20(nonTargetToken).safeTransfer(
-                beneficiary, ERC20(nonTargetToken).balanceOf(address(this))
-            );
+            amount = ERC20(nonWaterfallToken).balanceOf(address(this));
+            ERC20(nonWaterfallToken).safeTransfer(recipient, amount);
         }
 
-        // TODO: event
+        emit RecoverNonWaterfallFunds(nonWaterfallToken, recipient, amount);
     }
 }
