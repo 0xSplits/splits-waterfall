@@ -5,6 +5,8 @@ import {WaterfallModule} from "./WaterfallModule.sol";
 import {ClonesWithImmutableArgs} from
     "clones-with-immutable-args/ClonesWithImmutableArgs.sol";
 
+// TODO: add testing
+
 /// @title WaterfallModule
 /// @author 0xSplits
 /// @notice  A factory contract for cheaply deploying WaterfallModules.
@@ -77,10 +79,6 @@ contract WaterfallModuleFactory {
     /// functions - public & external
     /// -----------------------------------------------------------------------
 
-    // TODO: test memory v calldata
-    // TODO: uint96 v uint256 & check manually? may not need to check, just truncate
-    // if you don't check, need to run checks after truncating (e.g. no zero, sorted etc)
-
     /// Creates new WaterfallModule clone
     /// @param token Address of ERC20 to waterfall (0x0 used for ETH)
     /// @param trancheRecipients Addresses to waterfall payments to
@@ -96,35 +94,42 @@ contract WaterfallModuleFactory {
     {
         /// checks
 
-        // TODO: gas test caching lengths
+        // cache lengths for re-use
+        uint256 trancheRecipientsLength = trancheRecipients.length;
+        uint256 trancheThresholdsLength = trancheThresholds.length;
 
         // ensure recipients array has at least 2 entries
-        if (trancheRecipients.length < 2) revert
+        if (trancheRecipientsLength < 2) revert
             InvalidWaterfall__TooFewRecipients();
         // ensure recipients array is one longer than thresholds array
         unchecked {
             // shouldn't underflow since _trancheRecipientsLength >= 2
-            if (trancheThresholds.length != trancheRecipients.length - 1) revert
+            if (trancheThresholdsLength != trancheRecipientsLength - 1) revert
                 InvalidWaterfall__RecipientsAndThresholdsLengthMismatch();
         }
         // ensure first threshold isn't zero
         if (trancheThresholds[0] == 0) revert InvalidWaterfall__ZeroThreshold();
-        // ensure thresholds increase monotonically
+        // ensure packed thresholds increase monotonically
         uint256 i = 1;
-        for (; i < trancheThresholds.length;) {
+        for (; i < trancheThresholdsLength;) {
             unchecked {
                 // shouldn't underflow since i >= 1
-                if (trancheThresholds[i - 1] >= trancheThresholds[i]) revert
+                if (uint96(trancheThresholds[i - 1]) >= uint96(trancheThresholds[i])) revert
                     InvalidWaterfall__ThresholdsOutOfOrder(i);
                 // shouldn't overflow
                 ++i;
             }
         }
 
+        /// effects
+
         // copy recipients & thresholds into storage
         i = 0;
-        uint256[] memory tranches = new uint256[](trancheRecipients.length);
-        uint256 loopLength = tranches.length - 1;
+        uint256[] memory tranches = new uint256[](trancheRecipientsLength);
+        uint256 loopLength;
+        unchecked {
+            loopLength = trancheRecipientsLength - 1;
+        }
         for (; i < loopLength;) {
             tranches[i] = (trancheThresholds[i] << ADDRESS_BITS)
                 | uint256(uint160(trancheRecipients[i]));
@@ -136,9 +141,7 @@ contract WaterfallModuleFactory {
         // recipients array is one longer than thresholds array; set last item after loop
         tranches[i] = uint256(uint160(trancheRecipients[i]));
 
-        /// effects
-
-        bytes memory data = abi.encodePacked(token, tranches.length, tranches);
+        bytes memory data = abi.encodePacked(token, trancheRecipientsLength, tranches);
         wm = WaterfallModule(address(wmImpl).clone(data));
         emit CreateWaterfallModule(
             address(wm), token, trancheRecipients, trancheThresholds
