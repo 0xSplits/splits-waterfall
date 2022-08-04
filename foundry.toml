@@ -7,6 +7,8 @@ libs = ['lib']
 remappings = [
     'ds-test/=lib/forge-std/lib/ds-test/src/',
     'forge-std/=lib/forge-std/src/',
+    'clones-with-immutable-args/=lib/clones-with-immutable-args/src/',
+    'solmate/=lib/solmate/src/',
 ]
 libraries = []
 cache = true

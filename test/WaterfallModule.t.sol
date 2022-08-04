@@ -5,11 +5,12 @@ import {Test} from "forge-std/Test.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 
+import {WaterfallModuleFactory} from "../src/WaterfallModuleFactory.sol";
 import {WaterfallModule} from "../src/WaterfallModule.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 
-// TODO: add basic erc20 testing
-// TODO: add recovery testing
+// TODO: add factory testing
+// TODO: test views
 // TODO: add fuzzing testing
 // https://book.getfoundry.sh/reference/forge-std/bound
 // https://github.com/PraneshASP/forge-template/blob/main/src/test/utils/Utils.sol
@@ -35,6 +36,7 @@ contract WaterfallModuleTest is Test {
         uint256 amount
     );
 
+    WaterfallModuleFactory wmf;
     WaterfallModule wmETH;
     WaterfallModule wmERC20;
     MockERC20 mERC20;
@@ -56,11 +58,13 @@ contract WaterfallModuleTest is Test {
         mERC20 = new MockERC20("Test Token", "TOK", 18);
         mERC20.mint(type(uint256).max);
 
-        wmETH =
-            new WaterfallModule(address(0), _trancheRecipient, _trancheThreshold);
-
-        wmERC20 =
-        new WaterfallModule(address( mERC20 ), _trancheRecipient, _trancheThreshold);
+        wmf = new WaterfallModuleFactory();
+        wmETH = wmf.createWaterfallModule(
+            address(0), _trancheRecipient, _trancheThreshold
+        );
+        wmERC20 = wmf.createWaterfallModule(
+            address(mERC20), _trancheRecipient, _trancheThreshold
+        );
     }
 
     /// -----------------------------------------------------------------------
@@ -94,14 +98,18 @@ contract WaterfallModuleTest is Test {
         emit CreateWaterfallModule(
             address(0), address(0), _trancheRecipient, _trancheThreshold
             );
-        new WaterfallModule(address(0), _trancheRecipient, _trancheThreshold);
+        wmf.createWaterfallModule(
+            address(0), _trancheRecipient, _trancheThreshold
+        );
 
         // don't check deploy address
         vm.expectEmit(false, true, true, true);
         emit CreateWaterfallModule(
             address(0), address(mERC20), _trancheRecipient, _trancheThreshold
             );
-        new WaterfallModule(address( mERC20 ), _trancheRecipient, _trancheThreshold);
+        wmf.createWaterfallModule(
+            address(mERC20), _trancheRecipient, _trancheThreshold
+        );
     }
 
     function testCan_receiveETH() public {

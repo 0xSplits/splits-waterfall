@@ -1,18 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.15;
 
+import {Clone} from "clones-with-immutable-args/Clone.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 
-// TODO: clones-with-immutable-args
+// TODO: gas test: cache token()
+// TODO: revisit event args
+// TODO: add similar recovery for 721 / 1155 ?
+// TODO: fuzz testing
 // TODO: natspec
+// TODO: docs that thresholds are absolute
 
 /// @title WaterfallModule
-/// @author 0xSplits <will@0xSplits.xyz>
+/// @author 0xSplits
 /// @notice TODO
 /// @dev TODO
 /// This contract uses token = address(0) to refer to ETH.
-contract WaterfallModule {
+
+contract WaterfallModule is Clone {
     /// -----------------------------------------------------------------------
     /// libraries
     /// -----------------------------------------------------------------------
@@ -21,29 +27,8 @@ contract WaterfallModule {
     using SafeTransferLib for ERC20;
 
     /// -----------------------------------------------------------------------
-    /// types
-    /// -----------------------------------------------------------------------
-
-    // TODO
-    /* type Tranche is uint256; */
-
-    /// -----------------------------------------------------------------------
     /// errors
     /// -----------------------------------------------------------------------
-
-    /// Invalid number of recipients, must have at least 2
-    error InvalidWaterfall__TooFewRecipients();
-
-    /// Invalid recipient & threshold lengths; recipients must have one more entry
-    /// than thresholds
-    error InvalidWaterfall__RecipientsAndThresholdLengthMismatch();
-
-    /// Thresholds must be positive
-    error InvalidWaterfall__ZeroThreshold();
-
-    /// Invalid threshold at `index` (thresholds must increase monotonically)
-    /// @param index Index of out-of-order threshold
-    error InvalidWaterfall__ThresholdOutOfOrder(uint256 index);
 
     /// Invalid token recovery nonWaterfallToken
     error InvalidTokenRecovery_WaterfallToken();
@@ -55,20 +40,9 @@ contract WaterfallModule {
     /// events
     /// -----------------------------------------------------------------------
 
-    /// Emitted after a new waterfall module is deployed
-    /// @param waterfallModule Address of newly created WaterfallModule clone
-    /// @param token x
-    /// @param trancheRecipient x
-    /// @param trancheThreshold x
-    event CreateWaterfallModule(
-        address indexed waterfallModule,
-        address token,
-        address[] trancheRecipient,
-        uint256[] trancheThreshold
-    );
-
     /// Emitted after each successful ETH transfer to proxy
     /// @param amount Amount of ETH received
+    /// @dev embedded in & emitted from clone bytecode
     event ReceiveETH(uint256 amount);
 
     /// Emitted after funds are waterfall'd to recipients
@@ -90,77 +64,41 @@ contract WaterfallModule {
     /// storage
     /// -----------------------------------------------------------------------
 
-    // TODO: bitpack into uint256[]; maybe use custom struct for setter / getter
-    // TODO: use type aliasing?
-    // TODO: immutable (clones-with-immutable-args)
-    address[] public trancheRecipient;
-    uint256[] public trancheThreshold;
-    // TODO: private?
-    uint256 public immutable finalTranche;
+    uint256 internal constant THRESHOLD_BITS = 96;
+    uint256 internal constant ADDRESS_BITS = 160;
+    // TODO: gas test ~0 vs type( uint256 ).max
+    uint256 internal constant ADDRESS_BITMASK = uint256(~0 >> THRESHOLD_BITS);
 
-    address public immutable token;
+    /// Address of ERC20 to waterfall (0x0 used for ETH)
+    /// @dev equivalent to address public immutable token;
+    function token() public pure returns (address) {
+        return _getArgAddress(0);
+    }
+
+    // TODO: private / internal?
+    /// Number of waterfall tranches
+    /// @dev equivalent to uint256 public immutable numTranches;
+    function numTranches() public pure returns (uint256) {
+        return _getArgUint256(20);
+    }
+
+    /// Waterfall tranches
+    /// @dev equivalent to uint256[] internal immutable tranches;
+    function _tranches() internal pure returns (uint256[] memory) {
+        return _getArgUint256Array(52, uint64(numTranches()));
+    }
+
     uint256 public distributedFunds;
-    // TODO: private?
+    // TODO: internal?
+    // TODO: gas test calc'ing live (since array is immutable might be cheaper than SLOAD)
     uint256 public activeTranche;
 
     /// -----------------------------------------------------------------------
     /// constructor
     /// -----------------------------------------------------------------------
 
-    constructor(
-        address _token,
-        address[] memory _trancheRecipient,
-        uint256[] memory _trancheThreshold
-    ) {
-        token = _token;
-
-        // cache lengths in memory
-        uint256 _trancheRecipientLength = _trancheRecipient.length;
-        uint256 _trancheThresholdLength = _trancheThreshold.length;
-        finalTranche = _trancheThresholdLength;
-
-        // ensure recipients array has at least 2 entries
-        if (_trancheRecipientLength < 2) revert
-            InvalidWaterfall__TooFewRecipients();
-        // ensure recipients array is one longer than thresholds array
-        unchecked {
-            // shouldn't underflow since _trancheRecipientLength >= 2
-            if (_trancheThresholdLength != _trancheRecipientLength - 1) revert
-                InvalidWaterfall__RecipientsAndThresholdLengthMismatch();
-        }
-        // ensure first threshold isn't zero
-        if (_trancheThreshold[0] == 0) revert InvalidWaterfall__ZeroThreshold();
-        // ensure thresholds increase monotonically
-        uint256 i = 1;
-        for (; i < _trancheThresholdLength;) {
-            unchecked {
-                // shouldn't underflow since i >= 1
-                if (_trancheThreshold[i - 1] >= _trancheThreshold[i]) revert
-                    InvalidWaterfall__ThresholdOutOfOrder(i);
-                // shouldn't overflow
-                ++i;
-            }
-        }
-
-        // copy recipients & thresholds into storage
-        i = 0;
-        trancheRecipient = new address[](_trancheRecipientLength);
-        trancheThreshold = new uint256[](_trancheThresholdLength);
-        for (; i < _trancheThresholdLength;) {
-            trancheThreshold[i] = _trancheThreshold[i];
-            trancheRecipient[i] = _trancheRecipient[i];
-            unchecked {
-                // shouldn't overflow
-                ++i;
-            }
-        }
-        // recipients array is one longer than thresholds array; set last item after loop
-        trancheRecipient[i] = _trancheRecipient[i];
-
-        emit CreateWaterfallModule(
-            address(this), _token, _trancheRecipient, _trancheThreshold
-            );
-    }
+    // solhint-disable-next-line no-empty-blocks
+    constructor() {}
 
     /// -----------------------------------------------------------------------
     /// functions
@@ -172,9 +110,9 @@ contract WaterfallModule {
 
     /// emit event when receiving ETH
     /// @dev implemented w/i clone bytecode
-    receive() external payable {
-        emit ReceiveETH(msg.value);
-    }
+    /* receive() external payable { */
+    /*     emit ReceiveETH(msg.value); */
+    /* } */
 
     function waterfallFunds() external payable {
         /// checks
@@ -195,17 +133,27 @@ contract WaterfallModule {
                 // recognizes 0x0 as ETH
                 // shouldn't need to worry about re-entrancy from ERC20 view fn
                 (
-                    token == address(0)
+                    token() == address(0)
                         ? address(this).balance
-                        : ERC20(token).balanceOf(address(this))
+                        : ERC20(token()).balanceOf(address(this))
                 );
         }
 
         uint256 _startingActiveTranche = activeTranche;
         uint256 _activeTranche = _startingActiveTranche;
 
+        (address[] memory trancheRecipients, uint256[] memory trancheThresholds)
+            = getTranches();
+
+        // TODO: could use single loop if willing to make array w size {numTranches() - _activeTranche}
+        // may have to copy array over later pending final event args
+        // could also .. edit length directly in memory w yul?
+        // TODO: could get rid of _activeTranche & re-calc
+
+        // TODO: cache?
+        uint256 finalTranche = numTranches() - 1;
         for (; _activeTranche < finalTranche;) {
-            if (trancheThreshold[_activeTranche] >= _distributedFunds) {
+            if (trancheThresholds[_activeTranche] >= _distributedFunds) {
                 break;
             }
             unchecked {
@@ -236,8 +184,8 @@ contract WaterfallModule {
                 // shouldn't overflow
                 _trancheIndex = _startingActiveTranche + i;
 
-                _payoutAddresses[i] = trancheRecipient[_trancheIndex];
-                _trancheThreshold = trancheThreshold[_trancheIndex];
+                _payoutAddresses[i] = trancheRecipients[_trancheIndex];
+                _trancheThreshold = trancheThresholds[_trancheIndex];
                 // shouldn't underflow since _paidOut begins < active tranche's threshold and
                 // is then set to each preceding threshold (which are monotonically increasing)
                 _payouts[i] = _trancheThreshold - _paidOut;
@@ -252,7 +200,7 @@ contract WaterfallModule {
             // shouldn't overflow
             _trancheIndex = _startingActiveTranche + i;
 
-            _payoutAddresses[i] = trancheRecipient[_trancheIndex];
+            _payoutAddresses[i] = trancheRecipients[_trancheIndex];
             // _paidOut = last tranche threshold, which should be <= _distributedFunds by construction
             _payouts[i] = _distributedFunds - _paidOut;
 
@@ -268,10 +216,10 @@ contract WaterfallModule {
 
         // pay outs
         for (i = 0; i < _payoutsLength;) {
-            if (token == address(0)) {
+            if (token() == address(0)) {
                 (_payoutAddresses[i]).safeTransferETH(_payouts[i]);
             } else {
-                ERC20(token).safeTransfer(_payoutAddresses[i], _payouts[i]);
+                ERC20(token()).safeTransfer(_payoutAddresses[i], _payouts[i]);
             }
             unchecked {
                 // shouldn't overflow
@@ -279,8 +227,12 @@ contract WaterfallModule {
             }
         }
 
+        // TODO: are these the right args?
+        // technically don't need ~any for subgraph, but nice for readability / devex
         emit WaterfallFunds(_payoutAddresses, _payouts);
     }
+
+    // TODO: add similar fn for recovery of 721? 1155?
 
     function recoverNonWaterfallFunds(
         address nonWaterfallToken,
@@ -291,12 +243,15 @@ contract WaterfallModule {
     {
         /// checks
 
-        if (nonWaterfallToken == token) revert
+        if (nonWaterfallToken == token()) revert
             InvalidTokenRecovery_WaterfallToken();
 
+        // TODO: add fn to just pull recipients
+        (address[] memory trancheRecipients,) = getTranches();
         bool validRecipient = false;
-        for (uint256 i = 0; i <= finalTranche;) {
-            if (trancheRecipient[i] == recipient) {
+        // TODO: cache?
+        for (uint256 i = 0; i < numTranches();) {
+            if (trancheRecipients[i] == recipient) {
                 validRecipient = true;
                 break;
             }
@@ -323,5 +278,52 @@ contract WaterfallModule {
         }
 
         emit RecoverNonWaterfallFunds(nonWaterfallToken, recipient, amount);
+    }
+
+    /// -----------------------------------------------------------------------
+    /// functions - views
+    /// -----------------------------------------------------------------------
+
+    // TODO: add custom getter / view for _tranches()
+
+    function getTranches()
+        public
+        pure
+        returns (
+            address[] memory trancheRecipients,
+            uint256[] memory trancheThresholds
+        )
+    {
+        // TODO: gas test
+        /* uint256 numTranches = numTranches(); */
+        trancheRecipients = new address[](numTranches());
+        unchecked {
+            // shouldn't underflow
+            trancheThresholds = new uint256[](numTranches() - 1);
+        }
+
+        uint256 i = 0;
+        uint256 tranche;
+        // TODO: gas test v numTranches() - 1 v caching earlier
+        uint256 loopLength = trancheThresholds.length;
+        for (; i < loopLength;) {
+            // TODO: gas test vs loading full array
+            tranche = _getTranche(i);
+            trancheRecipients[i] = address(uint160(tranche & ADDRESS_BITMASK));
+            trancheThresholds[i] = tranche >> ADDRESS_BITS;
+            unchecked {
+                ++i;
+            }
+        }
+        // trancheRecipients has one more entry than trancheThresholds
+        tranche = _getTranche(i);
+        trancheRecipients[i] = address(uint160(tranche & ADDRESS_BITMASK));
+    }
+
+    function _getTranche(uint256 i) internal pure returns (uint256) {
+        unchecked {
+            // shouldn't overflow
+            return _getArgUint256(52 + i * 32);
+        }
     }
 }
