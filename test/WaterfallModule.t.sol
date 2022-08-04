@@ -7,6 +7,7 @@ import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 
 import {WaterfallModuleFactory} from "../src/WaterfallModuleFactory.sol";
 import {WaterfallModule} from "../src/WaterfallModule.sol";
+import {WaterfallReentrancy} from "./WaterfallReentrancy.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 
 // TODO: add factory testing
@@ -382,6 +383,27 @@ contract WaterfallModuleTest is Test {
         assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 0 ether);
         assertEq(ERC20(mERC20).balanceOf(address(0)), 1 ether);
         assertEq(ERC20(mERC20).balanceOf(address(1)), 19 ether);
+    }
+
+    function testCannot_reenterWaterfall() public {
+        WaterfallReentrancy wr = new WaterfallReentrancy();
+
+        uint256 _trancheRecipientLength = 2;
+        address[] memory _trancheRecipient =
+            new address[](_trancheRecipientLength);
+        _trancheRecipient[0] = address(wr);
+        _trancheRecipient[1] = address(0);
+        uint256 _trancheThresholdLength = _trancheRecipientLength - 1;
+        uint256[] memory _trancheThreshold =
+            new uint256[](_trancheThresholdLength);
+        _trancheThreshold[0] = 1 ether;
+
+        wmETH = wmf.createWaterfallModule(
+                                          address(0), _trancheRecipient, _trancheThreshold
+                                          );
+        address(wmETH).safeTransferETH(10 ether);
+        vm.expectRevert(bytes("ETH_TRANSFER_FAILED"));
+        wmETH.waterfallFunds();
     }
 
     /// -----------------------------------------------------------------------
