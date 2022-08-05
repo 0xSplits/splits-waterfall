@@ -50,13 +50,13 @@ contract WaterfallModuleFactory {
     /// Emitted after a new waterfall module is deployed
     /// @param waterfallModule Address of newly created WaterfallModule clone
     /// @param token Address of ERC20 to waterfall (0x0 used for ETH)
-    /// @param trancheRecipients Addresses to waterfall payments to
-    /// @param trancheThresholds Absolute thresholds for payment waterfall
+    /// @param recipients Addresses to waterfall payments to
+    /// @param thresholds Absolute thresholds for payment waterfall
     event CreateWaterfallModule(
         address indexed waterfallModule,
         address token,
-        address[] trancheRecipients,
-        uint256[] trancheThresholds
+        address[] recipients,
+        uint256[] thresholds
     );
 
     /// -----------------------------------------------------------------------
@@ -85,13 +85,13 @@ contract WaterfallModuleFactory {
 
     /// Creates new WaterfallModule clone
     /// @param token Address of ERC20 to waterfall (0x0 used for ETH)
-    /// @param trancheRecipients Addresses to waterfall payments to
-    /// @param trancheThresholds Absolute thresholds for payment waterfall
+    /// @param recipients Addresses to waterfall payments to
+    /// @param thresholds Absolute thresholds for payment waterfall
     /// @return wm Address of new WaterfallModule clone
     function createWaterfallModule(
         address token,
-        address[] calldata trancheRecipients,
-        uint256[] calldata trancheThresholds
+        address[] calldata recipients,
+        uint256[] calldata thresholds
     )
         external
         returns (WaterfallModule wm)
@@ -99,33 +99,31 @@ contract WaterfallModuleFactory {
         /// checks
 
         // cache lengths for re-use
-        uint256 trancheRecipientsLength = trancheRecipients.length;
-        uint256 trancheThresholdsLength = trancheThresholds.length;
+        uint256 recipientsLength = recipients.length;
+        uint256 thresholdsLength = thresholds.length;
 
         // ensure recipients array has at least 2 entries
-        if (trancheRecipientsLength < 2) revert
-            InvalidWaterfall__TooFewRecipients();
+        if (recipientsLength < 2) revert InvalidWaterfall__TooFewRecipients();
         // ensure recipients array is one longer than thresholds array
         unchecked {
-            // shouldn't underflow since _trancheRecipientsLength >= 2
-            if (trancheThresholdsLength != trancheRecipientsLength - 1) revert
+            // shouldn't underflow since _recipientsLength >= 2
+            if (thresholdsLength != recipientsLength - 1) revert
                 InvalidWaterfall__RecipientsAndThresholdsLengthMismatch();
         }
         // ensure first threshold isn't zero
-        if (trancheThresholds[0] == 0) revert InvalidWaterfall__ZeroThreshold();
+        if (thresholds[0] == 0) revert InvalidWaterfall__ZeroThreshold();
         // ensure first threshold isn't too large
-        if (uint96(trancheThresholds[0]) != trancheThresholds[0]) revert
+        if (uint96(thresholds[0]) != thresholds[0]) revert
             InvalidWaterfall__ThresholdTooLarge(0);
         // ensure packed thresholds increase monotonically
         uint256 i = 1;
-        for (; i < trancheThresholdsLength;) {
-            if (uint96(trancheThresholds[i]) != trancheThresholds[i]) revert
+        for (; i < thresholdsLength;) {
+            if (uint96(thresholds[i]) != thresholds[i]) revert
                 InvalidWaterfall__ThresholdTooLarge(i);
             unchecked {
                 // shouldn't underflow since i >= 1
-                if (
-                    uint96(trancheThresholds[i - 1]) >= uint96(trancheThresholds[i])
-                ) revert InvalidWaterfall__ThresholdsOutOfOrder(i);
+                if (thresholds[i - 1] >= thresholds[i]) revert
+                    InvalidWaterfall__ThresholdsOutOfOrder(i);
                 // shouldn't overflow
                 ++i;
             }
@@ -135,27 +133,24 @@ contract WaterfallModuleFactory {
 
         // copy recipients & thresholds into storage
         i = 0;
-        uint256[] memory tranches = new uint256[](trancheRecipientsLength);
+        uint256[] memory tranches = new uint256[](recipientsLength);
         uint256 loopLength;
         unchecked {
-            loopLength = trancheRecipientsLength - 1;
+            loopLength = recipientsLength - 1;
         }
         for (; i < loopLength;) {
-            tranches[i] = (trancheThresholds[i] << ADDRESS_BITS)
-                | uint256(uint160(trancheRecipients[i]));
+            tranches[i] =
+                (thresholds[i] << ADDRESS_BITS) | uint256(uint160(recipients[i]));
             unchecked {
                 // shouldn't overflow
                 ++i;
             }
         }
         // recipients array is one longer than thresholds array; set last item after loop
-        tranches[i] = uint256(uint160(trancheRecipients[i]));
+        tranches[i] = uint256(uint160(recipients[i]));
 
-        bytes memory data =
-            abi.encodePacked(token, trancheRecipientsLength, tranches);
+        bytes memory data = abi.encodePacked(token, recipientsLength, tranches);
         wm = WaterfallModule(address(wmImpl).clone(data));
-        emit CreateWaterfallModule(
-            address(wm), token, trancheRecipients, trancheThresholds
-            );
+        emit CreateWaterfallModule(address(wm), token, recipients, thresholds);
     }
 }

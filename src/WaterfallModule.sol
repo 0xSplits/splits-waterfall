@@ -77,7 +77,7 @@ contract WaterfallModule is Clone {
         return _getArgUint256(20);
     }
 
-    /// Waterfall tranches
+    /// Waterfall tranches (packed form)
     /// @dev equivalent to uint256[] internal immutable tranches;
     function _tranches() internal pure returns (uint256[] memory) {
         return _getArgUint256Array(52, uint64(numTranches()));
@@ -133,10 +133,8 @@ contract WaterfallModule is Clone {
         uint256 _startingActiveTranche = activeTranche;
         uint256 _activeTranche = _startingActiveTranche;
 
-        (address[] memory trancheRecipients, uint256[] memory trancheThresholds)
-            = getTranches();
-
-        // combine loop; activeTranche; general gas
+        (address[] memory recipients, uint256[] memory thresholds) =
+            getTranches();
 
         // TODO: could use single loop if willing to make array w size {numTranches() - _activeTranche}
         // and edit length directly in memory w assembly
@@ -147,7 +145,7 @@ contract WaterfallModule is Clone {
         {
             uint256 finalTranche = numTranches() - 1;
             for (; _activeTranche < finalTranche;) {
-                if (trancheThresholds[_activeTranche] >= _distributedFunds) {
+                if (thresholds[_activeTranche] >= _distributedFunds) {
                     break;
                 }
                 unchecked {
@@ -168,8 +166,8 @@ contract WaterfallModule is Clone {
         // adding scope allows compiler to discard vars on stack to avoid stack-too-deep
         {
             uint256 _paidOut = _startingDistributedFunds;
-            uint256 _trancheIndex;
-            uint256 _trancheThreshold;
+            uint256 _index;
+            uint256 _threshold;
             uint256 i = 0;
             uint256 loopLength;
             unchecked {
@@ -179,15 +177,15 @@ contract WaterfallModule is Clone {
             for (; i < loopLength;) {
                 unchecked {
                     // shouldn't overflow
-                    _trancheIndex = _startingActiveTranche + i;
+                    _index = _startingActiveTranche + i;
 
-                    _payoutAddresses[i] = trancheRecipients[_trancheIndex];
-                    _trancheThreshold = trancheThresholds[_trancheIndex];
+                    _payoutAddresses[i] = recipients[_index];
+                    _threshold = thresholds[_index];
                     // shouldn't underflow since _paidOut begins < active tranche's threshold and
                     // is then set to each preceding threshold (which are monotonically increasing)
-                    _payouts[i] = _trancheThreshold - _paidOut;
+                    _payouts[i] = _threshold - _paidOut;
 
-                    _paidOut = _trancheThreshold;
+                    _paidOut = _threshold;
                     // shouldn't overflow
                     ++i;
                 }
@@ -195,18 +193,17 @@ contract WaterfallModule is Clone {
             // i = _payoutsLength - 1, i.e. last payout
             unchecked {
                 // shouldn't overflow
-                _trancheIndex = _startingActiveTranche + i;
-
-                _payoutAddresses[i] = trancheRecipients[_trancheIndex];
+                _payoutAddresses[i] = recipients[_startingActiveTranche + i];
+                // shouldn't overflow
                 // _paidOut = last tranche threshold, which should be <= _distributedFunds by construction
                 _payouts[i] = _distributedFunds - _paidOut;
 
                 distributedFunds = _distributedFunds;
+                // shouldn't overflow
                 // if total amount of distributed funds is equal to the last tranche threshold, advance
                 // the active tranche by one
-                // shouldn't overflow
-                activeTranche = _activeTranche
-                    + (_trancheThreshold == _distributedFunds ? 1 : 0);
+                activeTranche =
+                    _activeTranche + (_threshold == _distributedFunds ? 1 : 0);
             }
         }
 
@@ -227,10 +224,6 @@ contract WaterfallModule is Clone {
             }
         }
 
-        // TODO: finalize args
-        // technically don't need ~any for subgraph, but nice for readability / devex
-        // but also kind of already replicated by etherscan's ui showing xfrs
-        // could either have no args or token & amount distributed
         emit WaterfallFunds(_payoutAddresses, _payouts);
     }
 
@@ -246,11 +239,11 @@ contract WaterfallModule is Clone {
         if (nonWaterfallToken == token()) revert
             InvalidTokenRecovery_WaterfallToken();
 
-        (address[] memory trancheRecipients,) = getTranches();
+        (address[] memory recipients,) = getTranches();
         bool validRecipient = false;
         uint256 _numTranches = numTranches();
         for (uint256 i = 0; i < _numTranches;) {
-            if (trancheRecipients[i] == recipient) {
+            if (recipients[i] == recipient) {
                 validRecipient = true;
                 break;
             }
@@ -286,10 +279,7 @@ contract WaterfallModule is Clone {
     function getTranches()
         public
         pure
-        returns (
-            address[] memory trancheRecipients,
-            uint256[] memory trancheThresholds
-        )
+        returns (address[] memory recipients, uint256[] memory thresholds)
     {
         uint256 numRecipients = numTranches();
         uint256 numThresholds;
@@ -297,21 +287,21 @@ contract WaterfallModule is Clone {
             // shouldn't underflow
             numThresholds = numRecipients - 1;
         }
-        trancheRecipients = new address[](numRecipients);
-        trancheThresholds = new uint256[](numThresholds);
+        recipients = new address[](numRecipients);
+        thresholds = new uint256[](numThresholds);
 
         uint256 i = 0;
         uint256 tranche;
         for (; i < numThresholds;) {
             tranche = _getTranche(i);
-            trancheRecipients[i] = address(uint160(tranche));
-            trancheThresholds[i] = tranche >> ADDRESS_BITS;
+            recipients[i] = address(uint160(tranche));
+            thresholds[i] = tranche >> ADDRESS_BITS;
             unchecked {
                 ++i;
             }
         }
-        // trancheRecipients has one more entry than trancheThresholds
-        trancheRecipients[i] = address(uint160(_getTranche(i)));
+        // recipients has one more entry than thresholds
+        recipients[i] = address(uint160(_getTranche(i)));
     }
 
     function _getTranche(uint256 i) internal pure returns (uint256) {
