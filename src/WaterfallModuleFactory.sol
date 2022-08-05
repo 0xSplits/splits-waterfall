@@ -5,6 +5,8 @@ import {WaterfallModule} from "./WaterfallModule.sol";
 import {ClonesWithImmutableArgs} from
     "clones-with-immutable-args/ClonesWithImmutableArgs.sol";
 
+// TODO: review natspec
+
 /// @title WaterfallModule
 /// @author 0xSplits
 /// @notice  A factory contract for cheaply deploying WaterfallModules.

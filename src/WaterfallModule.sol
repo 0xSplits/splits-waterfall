@@ -7,7 +7,6 @@ import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 
 // TODO: add similar recovery for 721 / 1155
 // TODO: natspec
-// TODO: document that thresholds are absolute #s
 
 /// @title WaterfallModule
 /// @author 0xSplits
@@ -307,6 +306,7 @@ contract WaterfallModule is Clone {
             tranche = _getTranche(i);
             // TODO: is bitmasking necessary or ~handled by the compiler when converting
             // uint256 to uint160?
+            // seems to work fine w/o explicit bitmask
             /* trancheRecipients[i] = address(uint160(tranche & ADDRESS_BITMASK)); */
             trancheRecipients[i] = address(uint160(tranche));
             trancheThresholds[i] = tranche >> ADDRESS_BITS;
@@ -316,6 +316,7 @@ contract WaterfallModule is Clone {
         }
         // trancheRecipients has one more entry than trancheThresholds
         tranche = _getTranche(i);
+        // TODO:
         /* trancheRecipients[i] = address(uint160(tranche & ADDRESS_BITMASK)); */
         trancheRecipients[i] = address(uint160(tranche));
     }
