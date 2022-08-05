@@ -5,8 +5,6 @@ import {WaterfallModule} from "./WaterfallModule.sol";
 import {ClonesWithImmutableArgs} from
     "clones-with-immutable-args/ClonesWithImmutableArgs.sol";
 
-// TODO: add testing
-
 /// @title WaterfallModule
 /// @author 0xSplits
 /// @notice  A factory contract for cheaply deploying WaterfallModules.
@@ -28,6 +26,10 @@ contract WaterfallModuleFactory {
 
     /// Thresholds must be positive
     error InvalidWaterfall__ZeroThreshold();
+
+    /// Invalid threshold at `index` (thresholds must be < 2^96)
+    /// @param index Index of too-large threshold
+    error InvalidWaterfall__ThresholdTooLarge(uint256 index);
 
     /// Invalid threshold at `index` (thresholds must increase monotonically)
     /// @param index Index of out-of-order threshold
@@ -109,13 +111,19 @@ contract WaterfallModuleFactory {
         }
         // ensure first threshold isn't zero
         if (trancheThresholds[0] == 0) revert InvalidWaterfall__ZeroThreshold();
+        // ensure first threshold isn't too large
+        if (uint96(trancheThresholds[0]) != trancheThresholds[0]) revert
+            InvalidWaterfall__ThresholdTooLarge(0);
         // ensure packed thresholds increase monotonically
         uint256 i = 1;
         for (; i < trancheThresholdsLength;) {
+            if (uint96(trancheThresholds[i]) != trancheThresholds[i]) revert
+                InvalidWaterfall__ThresholdTooLarge(i);
             unchecked {
                 // shouldn't underflow since i >= 1
-                if (uint96(trancheThresholds[i - 1]) >= uint96(trancheThresholds[i])) revert
-                    InvalidWaterfall__ThresholdsOutOfOrder(i);
+                if (
+                    uint96(trancheThresholds[i - 1]) >= uint96(trancheThresholds[i])
+                ) revert InvalidWaterfall__ThresholdsOutOfOrder(i);
                 // shouldn't overflow
                 ++i;
             }
@@ -141,7 +149,8 @@ contract WaterfallModuleFactory {
         // recipients array is one longer than thresholds array; set last item after loop
         tranches[i] = uint256(uint160(trancheRecipients[i]));
 
-        bytes memory data = abi.encodePacked(token, trancheRecipientsLength, tranches);
+        bytes memory data =
+            abi.encodePacked(token, trancheRecipientsLength, tranches);
         wm = WaterfallModule(address(wmImpl).clone(data));
         emit CreateWaterfallModule(
             address(wm), token, trancheRecipients, trancheThresholds

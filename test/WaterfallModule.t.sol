@@ -10,8 +10,6 @@ import {WaterfallModule} from "../src/WaterfallModule.sol";
 import {WaterfallReentrancy} from "./WaterfallReentrancy.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 
-// TODO: add factory testing
-// TODO: test views
 // TODO: add fuzzing testing
 // https://book.getfoundry.sh/reference/forge-std/bound
 // https://github.com/PraneshASP/forge-template/blob/main/src/test/utils/Utils.sol
@@ -77,40 +75,19 @@ contract WaterfallModuleTest is Test {
     /// -----------------------------------------------------------------------
 
     /// -----------------------------------------------------------------------
-    /// basic tests
+    /// correctness tests - basic
     /// -----------------------------------------------------------------------
 
-    function testCan_emitOnCreate() public {
-        uint256 _trancheRecipientLength = 2;
-        address[] memory _trancheRecipient =
-            new address[](_trancheRecipientLength);
-        for (uint256 i = 0; i < _trancheRecipientLength; i++) {
-            _trancheRecipient[i] = address(uint160(i));
-        }
-        uint256 _trancheThresholdLength = _trancheRecipientLength - 1;
-        uint256[] memory _trancheThreshold =
-            new uint256[](_trancheThresholdLength);
-        for (uint256 i = 0; i < _trancheThresholdLength; i++) {
-            _trancheThreshold[i] = (i + 1) * 1 ether;
-        }
+    function testCan_getTranches() public {
+        (address[] memory trancheRecipients, uint256[] memory trancheThresholds)
+            = wmETH.getTranches();
 
-        // don't check deploy address
-        vm.expectEmit(false, true, true, true);
-        emit CreateWaterfallModule(
-            address(0), address(0), _trancheRecipient, _trancheThreshold
-            );
-        wmf.createWaterfallModule(
-            address(0), _trancheRecipient, _trancheThreshold
-        );
-
-        // don't check deploy address
-        vm.expectEmit(false, true, true, true);
-        emit CreateWaterfallModule(
-            address(0), address(mERC20), _trancheRecipient, _trancheThreshold
-            );
-        wmf.createWaterfallModule(
-            address(mERC20), _trancheRecipient, _trancheThreshold
-        );
+        for (uint256 i = 0; i < trancheRecipients.length; i++) {
+            assertEq(trancheRecipients[i], address(uint160(i)));
+        }
+        for (uint256 i = 0; i < trancheThresholds.length; i++) {
+            assertEq(trancheThresholds[i], (i + 1) * 1 ether);
+        }
     }
 
     function testCan_receiveETH() public {
@@ -399,14 +376,17 @@ contract WaterfallModuleTest is Test {
         _trancheThreshold[0] = 1 ether;
 
         wmETH = wmf.createWaterfallModule(
-                                          address(0), _trancheRecipient, _trancheThreshold
-                                          );
+            address(0), _trancheRecipient, _trancheThreshold
+        );
         address(wmETH).safeTransferETH(10 ether);
         vm.expectRevert(bytes("ETH_TRANSFER_FAILED"));
         wmETH.waterfallFunds();
+        assertEq(address(wmETH).balance, 10 ether);
+        assertEq(address(wr).balance, 0 ether);
+        assertEq(address(0).balance, 0 ether);
     }
 
     /// -----------------------------------------------------------------------
-    /// fuzz tests
+    /// correctness tests - fuzzing
     /// -----------------------------------------------------------------------
 }

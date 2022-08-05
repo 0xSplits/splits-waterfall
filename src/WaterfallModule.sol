@@ -6,7 +6,6 @@ import {ERC20} from "solmate/tokens/ERC20.sol";
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 
 // TODO: add similar recovery for 721 / 1155
-// TODO: fuzz testing
 // TODO: natspec
 // TODO: document that thresholds are absolute #s
 
@@ -62,6 +61,7 @@ contract WaterfallModule is Clone {
     /// storage
     /// -----------------------------------------------------------------------
 
+    address internal constant ETH_ADDRESS = address(0);
     uint256 internal constant THRESHOLD_BITS = 96;
     uint256 internal constant ADDRESS_BITS = 160;
     uint256 internal constant ADDRESS_BITMASK = uint256(~0 >> THRESHOLD_BITS);
@@ -125,7 +125,7 @@ contract WaterfallModule is Clone {
                 // recognizes 0x0 as ETH
                 // shouldn't need to worry about re-entrancy from ERC20 view fn
                 (
-                    _token == address(0)
+                    _token == ETH_ADDRESS
                         ? address(this).balance
                         : ERC20(_token).balanceOf(address(this))
                 );
@@ -217,7 +217,7 @@ contract WaterfallModule is Clone {
         // earlier external calls may try to re-enter but will cause fn to revert
         // when later external calls fail (bc balance is emptied early)
         for (uint256 i = 0; i < _payoutsLength;) {
-            if (_token == address(0)) {
+            if (_token == ETH_ADDRESS) {
                 (_payoutAddresses[i]).safeTransferETH(_payouts[i]);
             } else {
                 ERC20(_token).safeTransfer(_payoutAddresses[i], _payouts[i]);
@@ -269,7 +269,7 @@ contract WaterfallModule is Clone {
         /// interactions
 
         uint256 amount;
-        if (nonWaterfallToken == address(0)) {
+        if (nonWaterfallToken == ETH_ADDRESS) {
             amount = address(this).balance;
             recipient.safeTransferETH(amount);
         } else {
@@ -281,7 +281,7 @@ contract WaterfallModule is Clone {
     }
 
     /// -----------------------------------------------------------------------
-    /// functions - views
+    /// functions - view & pure
     /// -----------------------------------------------------------------------
 
     function getTranches()
