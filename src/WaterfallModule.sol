@@ -304,10 +304,6 @@ contract WaterfallModule is Clone {
         uint256 tranche;
         for (; i < numThresholds;) {
             tranche = _getTranche(i);
-            // TODO: is bitmasking necessary or ~handled by the compiler when converting
-            // uint256 to uint160?
-            // seems to work fine w/o explicit bitmask
-            /* trancheRecipients[i] = address(uint160(tranche & ADDRESS_BITMASK)); */
             trancheRecipients[i] = address(uint160(tranche));
             trancheThresholds[i] = tranche >> ADDRESS_BITS;
             unchecked {
@@ -315,10 +311,7 @@ contract WaterfallModule is Clone {
             }
         }
         // trancheRecipients has one more entry than trancheThresholds
-        tranche = _getTranche(i);
-        // TODO:
-        /* trancheRecipients[i] = address(uint160(tranche & ADDRESS_BITMASK)); */
-        trancheRecipients[i] = address(uint160(tranche));
+        trancheRecipients[i] = address(uint160(_getTranche(i)));
     }
 
     function _getTranche(uint256 i) internal pure returns (uint256) {
