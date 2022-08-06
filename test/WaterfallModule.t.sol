@@ -29,11 +29,7 @@ contract WaterfallModuleTest is Test {
 
     event WaterfallFunds(address[] recipients, uint256[] payouts);
 
-    event RecoverNonWaterfallFunds(
-        address nonWaterfallToken,
-        address recipient,
-        uint256 amount
-    );
+    event RecoverNonWaterfallFunds(address nonWaterfallToken, address recipient, uint256 amount);
 
     WaterfallModuleFactory wmf;
     WaterfallModule wmETH;
@@ -42,14 +38,12 @@ contract WaterfallModuleTest is Test {
 
     function setUp() public {
         uint256 _trancheRecipientLength = 2;
-        address[] memory _trancheRecipient =
-            new address[](_trancheRecipientLength);
+        address[] memory _trancheRecipient = new address[](_trancheRecipientLength);
         for (uint256 i = 0; i < _trancheRecipientLength; i++) {
             _trancheRecipient[i] = address(uint160(i));
         }
         uint256 _trancheThresholdLength = _trancheRecipientLength - 1;
-        uint256[] memory _trancheThreshold =
-            new uint256[](_trancheThresholdLength);
+        uint256[] memory _trancheThreshold = new uint256[](_trancheThresholdLength);
         for (uint256 i = 0; i < _trancheThresholdLength; i++) {
             _trancheThreshold[i] = (i + 1) * 1 ether;
         }
@@ -58,12 +52,8 @@ contract WaterfallModuleTest is Test {
         mERC20.mint(type(uint256).max);
 
         wmf = new WaterfallModuleFactory();
-        wmETH = wmf.createWaterfallModule(
-            address(0), _trancheRecipient, _trancheThreshold
-        );
-        wmERC20 = wmf.createWaterfallModule(
-            address(mERC20), _trancheRecipient, _trancheThreshold
-        );
+        wmETH = wmf.createWaterfallModule(address(0), _trancheRecipient, _trancheThreshold);
+        wmERC20 = wmf.createWaterfallModule(address(mERC20), _trancheRecipient, _trancheThreshold);
     }
 
     /// -----------------------------------------------------------------------
@@ -79,8 +69,8 @@ contract WaterfallModuleTest is Test {
     /// -----------------------------------------------------------------------
 
     function testCan_getTranches() public {
-        (address[] memory trancheRecipients, uint256[] memory trancheThresholds)
-            = wmETH.getTranches();
+        (address[] memory trancheRecipients, uint256[] memory trancheThresholds) =
+            wmETH.getTranches();
 
         for (uint256 i = 0; i < trancheRecipients.length; i++) {
             assertEq(trancheRecipients[i], address(uint160(i)));
@@ -165,17 +155,13 @@ contract WaterfallModuleTest is Test {
         address(wmETH).safeTransferETH(1 ether);
         ERC20(mERC20).safeTransfer(address(wmETH), 1 ether);
 
-        vm.expectRevert(
-            WaterfallModule.InvalidTokenRecovery_InvalidRecipient.selector
-        );
+        vm.expectRevert(WaterfallModule.InvalidTokenRecovery_InvalidRecipient.selector);
         wmETH.recoverNonWaterfallFunds(address(mERC20), address(2));
 
         ERC20(mERC20).safeTransfer(address(wmERC20), 1 ether);
         address(wmERC20).safeTransferETH(1 ether);
 
-        vm.expectRevert(
-            WaterfallModule.InvalidTokenRecovery_InvalidRecipient.selector
-        );
+        vm.expectRevert(WaterfallModule.InvalidTokenRecovery_InvalidRecipient.selector);
         wmERC20.recoverNonWaterfallFunds(address(0), address(2));
     }
 
@@ -183,17 +169,13 @@ contract WaterfallModuleTest is Test {
         address(wmETH).safeTransferETH(1 ether);
         ERC20(mERC20).safeTransfer(address(wmETH), 1 ether);
 
-        vm.expectRevert(
-            WaterfallModule.InvalidTokenRecovery_WaterfallToken.selector
-        );
+        vm.expectRevert(WaterfallModule.InvalidTokenRecovery_WaterfallToken.selector);
         wmETH.recoverNonWaterfallFunds(address(0), address(0));
 
         ERC20(mERC20).safeTransfer(address(wmERC20), 1 ether);
         address(wmERC20).safeTransferETH(1 ether);
 
-        vm.expectRevert(
-            WaterfallModule.InvalidTokenRecovery_WaterfallToken.selector
-        );
+        vm.expectRevert(WaterfallModule.InvalidTokenRecovery_WaterfallToken.selector);
         wmERC20.recoverNonWaterfallFunds(address(mERC20), address(0));
     }
 
@@ -366,18 +348,14 @@ contract WaterfallModuleTest is Test {
         WaterfallReentrancy wr = new WaterfallReentrancy();
 
         uint256 _trancheRecipientLength = 2;
-        address[] memory _trancheRecipient =
-            new address[](_trancheRecipientLength);
+        address[] memory _trancheRecipient = new address[](_trancheRecipientLength);
         _trancheRecipient[0] = address(wr);
         _trancheRecipient[1] = address(0);
         uint256 _trancheThresholdLength = _trancheRecipientLength - 1;
-        uint256[] memory _trancheThreshold =
-            new uint256[](_trancheThresholdLength);
+        uint256[] memory _trancheThreshold = new uint256[](_trancheThresholdLength);
         _trancheThreshold[0] = 1 ether;
 
-        wmETH = wmf.createWaterfallModule(
-            address(0), _trancheRecipient, _trancheThreshold
-        );
+        wmETH = wmf.createWaterfallModule(address(0), _trancheRecipient, _trancheThreshold);
         address(wmETH).safeTransferETH(10 ether);
         vm.expectRevert(bytes("ETH_TRANSFER_FAILED"));
         wmETH.waterfallFunds();
@@ -385,8 +363,7 @@ contract WaterfallModuleTest is Test {
         assertEq(address(wr).balance, 0 ether);
         assertEq(address(0).balance, 0 ether);
     }
-
-    /// -----------------------------------------------------------------------
-    /// correctness tests - fuzzing
-    /// -----------------------------------------------------------------------
 }
+/// -----------------------------------------------------------------------
+/// correctness tests - fuzzing
+/// -----------------------------------------------------------------------

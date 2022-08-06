@@ -2,8 +2,7 @@
 pragma solidity 0.8.15;
 
 import {WaterfallModule} from "./WaterfallModule.sol";
-import {ClonesWithImmutableArgs} from
-    "clones-with-immutable-args/ClonesWithImmutableArgs.sol";
+import {ClonesWithImmutableArgs} from "clones-with-immutable-args/ClonesWithImmutableArgs.sol";
 
 // TODO: natspec
 
@@ -52,10 +51,7 @@ contract WaterfallModuleFactory {
     /// @param recipients Addresses to waterfall payments to
     /// @param thresholds Absolute thresholds for payment waterfall
     event CreateWaterfallModule(
-        address indexed waterfallModule,
-        address token,
-        address[] recipients,
-        uint256[] thresholds
+        address indexed waterfallModule, address token, address[] recipients, uint256[] thresholds
     );
 
     /// -----------------------------------------------------------------------
@@ -102,27 +98,35 @@ contract WaterfallModuleFactory {
         uint256 thresholdsLength = thresholds.length;
 
         // ensure recipients array has at least 2 entries
-        if (recipientsLength < 2) revert InvalidWaterfall__TooFewRecipients();
+        if (recipientsLength < 2) {
+            revert InvalidWaterfall__TooFewRecipients();
+        }
         // ensure recipients array is one longer than thresholds array
         unchecked {
             // shouldn't underflow since _recipientsLength >= 2
-            if (thresholdsLength != recipientsLength - 1) revert
-                InvalidWaterfall__RecipientsAndThresholdsLengthMismatch();
+            if (thresholdsLength != recipientsLength - 1) {
+                revert InvalidWaterfall__RecipientsAndThresholdsLengthMismatch();
+            }
         }
         // ensure first threshold isn't zero
-        if (thresholds[0] == 0) revert InvalidWaterfall__ZeroThreshold();
+        if (thresholds[0] == 0) {
+            revert InvalidWaterfall__ZeroThreshold();
+        }
         // ensure first threshold isn't too large
-        if (uint96(thresholds[0]) != thresholds[0]) revert
-            InvalidWaterfall__ThresholdTooLarge(0);
+        if (uint96(thresholds[0]) != thresholds[0]) {
+            revert InvalidWaterfall__ThresholdTooLarge(0);
+        }
         // ensure packed thresholds increase monotonically
         uint256 i = 1;
         for (; i < thresholdsLength;) {
-            if (uint96(thresholds[i]) != thresholds[i]) revert
-                InvalidWaterfall__ThresholdTooLarge(i);
+            if (uint96(thresholds[i]) != thresholds[i]) {
+                revert InvalidWaterfall__ThresholdTooLarge(i);
+            }
             unchecked {
                 // shouldn't underflow since i >= 1
-                if (thresholds[i - 1] >= thresholds[i]) revert
-                    InvalidWaterfall__ThresholdsOutOfOrder(i);
+                if (thresholds[i - 1] >= thresholds[i]) {
+                    revert InvalidWaterfall__ThresholdsOutOfOrder(i);
+                }
                 // shouldn't overflow
                 ++i;
             }
@@ -138,8 +142,7 @@ contract WaterfallModuleFactory {
             loopLength = recipientsLength - 1;
         }
         for (; i < loopLength;) {
-            tranches[i] =
-                (thresholds[i] << ADDRESS_BITS) | uint256(uint160(recipients[i]));
+            tranches[i] = (thresholds[i] << ADDRESS_BITS) | uint256(uint160(recipients[i]));
             unchecked {
                 // shouldn't overflow
                 ++i;

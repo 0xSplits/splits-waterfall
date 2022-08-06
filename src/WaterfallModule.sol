@@ -52,11 +52,7 @@ contract WaterfallModule is Clone {
     /// @param nonWaterfallToken x
     /// @param recipient x
     /// @param amount x
-    event RecoverNonWaterfallFunds(
-        address nonWaterfallToken,
-        address recipient,
-        uint256 amount
-    );
+    event RecoverNonWaterfallFunds(address nonWaterfallToken, address recipient, uint256 amount);
 
     /// -----------------------------------------------------------------------
     /// storage
@@ -126,18 +122,13 @@ contract WaterfallModule is Clone {
                 +
                 // recognizes 0x0 as ETH
                 // shouldn't need to worry about re-entrancy from ERC20 view fn
-                (
-                    _token == ETH_ADDRESS
-                        ? address(this).balance
-                        : ERC20(_token).balanceOf(address(this))
-                );
+                (_token == ETH_ADDRESS ? address(this).balance : ERC20(_token).balanceOf(address(this)));
         }
 
         uint256 _startingActiveTranche = activeTranche;
         uint256 _activeTranche = _startingActiveTranche;
 
-        (address[] memory recipients, uint256[] memory thresholds) =
-            getTranches();
+        (address[] memory recipients, uint256[] memory thresholds) = getTranches();
 
         // TODO: could use single loop if willing to make array w size {numTranches() - _activeTranche}
         // and edit length directly in memory w assembly
@@ -205,8 +196,7 @@ contract WaterfallModule is Clone {
                 // shouldn't overflow
                 // if total amount of distributed funds is equal to the last tranche threshold, advance
                 // the active tranche by one
-                activeTranche =
-                    _activeTranche + (_threshold == _distributedFunds ? 1 : 0);
+                activeTranche = _activeTranche + (_threshold == _distributedFunds ? 1 : 0);
             }
         }
 
@@ -230,17 +220,15 @@ contract WaterfallModule is Clone {
         emit WaterfallFunds(_payoutAddresses, _payouts);
     }
 
-    function recoverNonWaterfallFunds(
-        address nonWaterfallToken,
-        address recipient
-    )
+    function recoverNonWaterfallFunds(address nonWaterfallToken, address recipient)
         external
         payable
     {
         /// checks
 
-        if (nonWaterfallToken == token()) revert
-            InvalidTokenRecovery_WaterfallToken();
+        if (nonWaterfallToken == token()) {
+            revert InvalidTokenRecovery_WaterfallToken();
+        }
 
         (address[] memory recipients,) = getTranches();
         bool validRecipient = false;
