@@ -6,6 +6,8 @@ import {ERC20} from "solmate/tokens/ERC20.sol";
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 
 // TODO: add similar recovery for 721 / 1155
+// TODO: pull clones-with-immutable-args updates from
+// https://github.com/wighawag/clones-with-immutable-args/pull/14
 // TODO: natspec
 
 /// @title WaterfallModule
@@ -74,6 +76,7 @@ contract WaterfallModule is Clone {
     /// Number of waterfall tranches
     /// @dev equivalent to uint256 internal immutable numTranches;
     function numTranches() internal pure returns (uint256) {
+        // TODO: use _getArgUint64 ?
         return _getArgUint256(20);
     }
 

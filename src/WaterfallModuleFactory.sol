@@ -5,15 +5,14 @@ import {WaterfallModule} from "./WaterfallModule.sol";
 import {ClonesWithImmutableArgs} from
     "clones-with-immutable-args/ClonesWithImmutableArgs.sol";
 
-// TODO: review natspec
+// TODO: natspec
 
 /// @title WaterfallModule
 /// @author 0xSplits
-/// @notice  A factory contract for cheaply deploying WaterfallModules.
+/// @notice A factory contract for cheaply deploying WaterfallModules.
 /// @dev This factory uses our own extension of clones-with-immutable-args to avoid
 /// `DELEGATECALL` inside `receive()` to accept hard gas-capped `sends` & `transfers`
 /// for maximum backwards composability.
-
 contract WaterfallModuleFactory {
     /// -----------------------------------------------------------------------
     /// errors
