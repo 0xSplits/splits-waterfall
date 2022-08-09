@@ -2,7 +2,8 @@
 pragma solidity 0.8.15;
 
 import {WaterfallModule} from "./WaterfallModule.sol";
-import {ClonesWithImmutableArgs} from "clones-with-immutable-args/ClonesWithImmutableArgs.sol";
+import {ClonesWithImmutableArgs} from
+    "clones-with-immutable-args/ClonesWithImmutableArgs.sol";
 
 // TODO: natspec
 
@@ -51,7 +52,10 @@ contract WaterfallModuleFactory {
     /// @param recipients Addresses to waterfall payments to
     /// @param thresholds Absolute thresholds for payment waterfall
     event CreateWaterfallModule(
-        address indexed waterfallModule, address token, address[] recipients, uint256[] thresholds
+        address indexed waterfallModule,
+        address token,
+        address[] recipients,
+        uint256[] thresholds
     );
 
     /// -----------------------------------------------------------------------
@@ -142,7 +146,8 @@ contract WaterfallModuleFactory {
             loopLength = recipientsLength - 1;
         }
         for (; i < loopLength;) {
-            tranches[i] = (thresholds[i] << ADDRESS_BITS) | uint256(uint160(recipients[i]));
+            tranches[i] =
+                (thresholds[i] << ADDRESS_BITS) | uint256(uint160(recipients[i]));
             unchecked {
                 // shouldn't overflow
                 ++i;

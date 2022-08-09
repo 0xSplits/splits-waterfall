@@ -15,7 +15,6 @@ import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 /// @notice TODO
 /// @dev TODO
 /// This contract uses token = address(0) to refer to ETH.
-
 contract WaterfallModule is Clone {
     /// -----------------------------------------------------------------------
     /// libraries
@@ -52,7 +51,9 @@ contract WaterfallModule is Clone {
     /// @param nonWaterfallToken x
     /// @param recipient x
     /// @param amount x
-    event RecoverNonWaterfallFunds(address nonWaterfallToken, address recipient, uint256 amount);
+    event RecoverNonWaterfallFunds(
+        address nonWaterfallToken, address recipient, uint256 amount
+    );
 
     /// -----------------------------------------------------------------------
     /// storage
@@ -122,29 +123,30 @@ contract WaterfallModule is Clone {
                 +
                 // recognizes 0x0 as ETH
                 // shouldn't need to worry about re-entrancy from ERC20 view fn
-                (_token == ETH_ADDRESS ? address(this).balance : ERC20(_token).balanceOf(address(this)));
+                (
+                    _token == ETH_ADDRESS
+                        ? address(this).balance
+                        : ERC20(_token).balanceOf(address(this))
+                );
         }
 
         uint256 _startingActiveTranche = activeTranche;
         uint256 _activeTranche = _startingActiveTranche;
 
-        (address[] memory recipients, uint256[] memory thresholds) = getTranches();
+        (address[] memory recipients, uint256[] memory thresholds) =
+            getTranches();
 
         // TODO: could use single loop if willing to make array w size {numTranches() - _activeTranche}
         // and edit length directly in memory w assembly
         // TODO: could get rid of _activeTranche & calc breakeven (should save gas for smaller waterfalls)
         // what's the breakeven?
 
-        // adding scope allows compiler to discard vars on stack to avoid stack-too-deep
-        {
+        unchecked {
+            // shouldn't underflow while numTranches() >= 2
             uint256 finalTranche = numTranches() - 1;
-            for (; _activeTranche < finalTranche;) {
+            for (; _activeTranche < finalTranche; ++_activeTranche) {
                 if (thresholds[_activeTranche] >= _distributedFunds) {
                     break;
-                }
-                unchecked {
-                    // shouldn't overflow
-                    ++_activeTranche;
                 }
             }
         }
@@ -157,7 +159,7 @@ contract WaterfallModule is Clone {
         address[] memory _payoutAddresses = new address[](_payoutsLength);
         uint256[] memory _payouts = new uint256[](_payoutsLength);
 
-        // adding scope allows compiler to discard vars on stack to avoid stack-too-deep
+        // scope allows compiler to discard vars on stack to avoid stack-too-deep
         {
             uint256 _paidOut = _startingDistributedFunds;
             uint256 _index;
@@ -175,8 +177,9 @@ contract WaterfallModule is Clone {
 
                     _payoutAddresses[i] = recipients[_index];
                     _threshold = thresholds[_index];
-                    // shouldn't underflow since _paidOut begins < active tranche's threshold and
-                    // is then set to each preceding threshold (which are monotonically increasing)
+                    // shouldn't underflow since _paidOut begins < active
+                    // tranche's threshold and is then set to each preceding
+                    // threshold (which are monotonically increasing)
                     _payouts[i] = _threshold - _paidOut;
 
                     _paidOut = _threshold;
@@ -188,15 +191,16 @@ contract WaterfallModule is Clone {
             unchecked {
                 // shouldn't overflow
                 _payoutAddresses[i] = recipients[_startingActiveTranche + i];
-                // shouldn't overflow
-                // _paidOut = last tranche threshold, which should be <= _distributedFunds by construction
+                // shouldn't overflow since _paidOut = last tranche threshold,
+                // which should be <= _distributedFunds by construction
                 _payouts[i] = _distributedFunds - _paidOut;
 
                 distributedFunds = _distributedFunds;
                 // shouldn't overflow
-                // if total amount of distributed funds is equal to the last tranche threshold, advance
-                // the active tranche by one
-                activeTranche = _activeTranche + (_threshold == _distributedFunds ? 1 : 0);
+                // if total amount of distributed funds is equal to the last
+                // tranche threshold, advance the active tranche by one
+                activeTranche =
+                    _activeTranche + (_threshold == _distributedFunds ? 1 : 0);
             }
         }
 
@@ -220,7 +224,10 @@ contract WaterfallModule is Clone {
         emit WaterfallFunds(_payoutAddresses, _payouts);
     }
 
-    function recoverNonWaterfallFunds(address nonWaterfallToken, address recipient)
+    function recoverNonWaterfallFunds(
+        address nonWaterfallToken,
+        address recipient
+    )
         external
         payable
     {
