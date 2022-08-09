@@ -84,7 +84,6 @@ contract WaterfallModule is Clone {
     }
 
     uint256 public distributedFunds;
-    uint256 internal activeTranche;
 
     /// -----------------------------------------------------------------------
     /// constructor
@@ -116,10 +115,10 @@ contract WaterfallModule is Clone {
 
         address _token = token();
         uint256 _startingDistributedFunds = distributedFunds;
-        uint256 _distributedFunds;
+        uint256 _endingDistributedFunds;
         unchecked {
             // shouldn't overflow
-            _distributedFunds = _startingDistributedFunds
+            _endingDistributedFunds = _startingDistributedFunds
                 +
                 // recognizes 0x0 as ETH
                 // shouldn't need to worry about re-entrancy from ERC20 view fn
@@ -130,22 +129,26 @@ contract WaterfallModule is Clone {
                 );
         }
 
-        uint256 _startingActiveTranche = activeTranche;
-        uint256 _activeTranche = _startingActiveTranche;
-
         (address[] memory recipients, uint256[] memory thresholds) =
             getTranches();
 
-        // TODO: could use single loop if willing to make array w size {numTranches() - _activeTranche}
-        // and edit length directly in memory w assembly
-        // TODO: could get rid of _activeTranche & calc breakeven (should save gas for smaller waterfalls)
-        // what's the breakeven?
-
+        uint256 _firstPayoutTranche;
+        uint256 _lastPayoutTranche;
         unchecked {
             // shouldn't underflow while numTranches() >= 2
             uint256 finalTranche = numTranches() - 1;
-            for (; _activeTranche < finalTranche; ++_activeTranche) {
-                if (thresholds[_activeTranche] >= _distributedFunds) {
+            // index inc shouldn't overflow
+            for (; _firstPayoutTranche < finalTranche; ++_firstPayoutTranche) {
+                if (
+                    thresholds[_firstPayoutTranche] >= _startingDistributedFunds
+                ) {
+                    break;
+                }
+            }
+            _lastPayoutTranche = _firstPayoutTranche;
+            // index inc shouldn't overflow
+            for (; _lastPayoutTranche < finalTranche; ++_lastPayoutTranche) {
+                if (thresholds[_lastPayoutTranche] >= _endingDistributedFunds) {
                     break;
                 }
             }
@@ -153,8 +156,8 @@ contract WaterfallModule is Clone {
 
         uint256 _payoutsLength;
         unchecked {
-            // shouldn't underflow since _activeTranche >= _startingActiveTranche
-            _payoutsLength = _activeTranche - _startingActiveTranche + 1;
+            // shouldn't underflow since _lastPayoutTranche >= _firstPayoutTranche
+            _payoutsLength = _lastPayoutTranche - _firstPayoutTranche + 1;
         }
         address[] memory _payoutAddresses = new address[](_payoutsLength);
         uint256[] memory _payouts = new uint256[](_payoutsLength);
@@ -173,7 +176,7 @@ contract WaterfallModule is Clone {
             for (; i < loopLength;) {
                 unchecked {
                     // shouldn't overflow
-                    _index = _startingActiveTranche + i;
+                    _index = _firstPayoutTranche + i;
 
                     _payoutAddresses[i] = recipients[_index];
                     _threshold = thresholds[_index];
@@ -190,18 +193,13 @@ contract WaterfallModule is Clone {
             // i = _payoutsLength - 1, i.e. last payout
             unchecked {
                 // shouldn't overflow
-                _payoutAddresses[i] = recipients[_startingActiveTranche + i];
+                _payoutAddresses[i] = recipients[_firstPayoutTranche + i];
                 // shouldn't overflow since _paidOut = last tranche threshold,
-                // which should be <= _distributedFunds by construction
-                _payouts[i] = _distributedFunds - _paidOut;
-
-                distributedFunds = _distributedFunds;
-                // shouldn't overflow
-                // if total amount of distributed funds is equal to the last
-                // tranche threshold, advance the active tranche by one
-                activeTranche =
-                    _activeTranche + (_threshold == _distributedFunds ? 1 : 0);
+                // which should be <= _endingDistributedFunds by construction
+                _payouts[i] = _endingDistributedFunds - _paidOut;
             }
+
+            distributedFunds = _endingDistributedFunds;
         }
 
         /// interactions
