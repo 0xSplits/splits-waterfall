@@ -5,15 +5,13 @@ import {Clone} from "clones-with-immutable-args/Clone.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 
-// TODO: add similar recovery for 721 / 1155
-// TODO: pull clones-with-immutable-args updates from
-// https://github.com/wighawag/clones-with-immutable-args/pull/14
-// TODO: natspec
-
 /// @title WaterfallModule
 /// @author 0xSplits
-/// @notice TODO
-/// @dev TODO
+/// @notice A maximally-composable waterfall contract allowing multiple
+/// recipients to receive preferential payments before residual funds flow to a
+/// final address.
+/// @dev /// Only one token can be waterfall'd for a given deployment. There is a
+/// recovery method for non-target tokens sent by accident.
 /// This contract uses token = address(0) to refer to ETH.
 contract WaterfallModule is Clone {
     /// -----------------------------------------------------------------------
@@ -27,10 +25,10 @@ contract WaterfallModule is Clone {
     /// errors
     /// -----------------------------------------------------------------------
 
-    /// Invalid token recovery nonWaterfallToken
+    /// Invalid token recovery; cannot recover the waterfall token
     error InvalidTokenRecovery_WaterfallToken();
 
-    /// Invalid token recovery recipient
+    /// Invalid token recovery recipient; not a waterfall recipient
     error InvalidTokenRecovery_InvalidRecipient();
 
     /// -----------------------------------------------------------------------
@@ -43,14 +41,14 @@ contract WaterfallModule is Clone {
     event ReceiveETH(uint256 amount);
 
     /// Emitted after funds are waterfall'd to recipients
-    /// @param recipients x
-    /// @param payouts x
+    /// @param recipients Addresses receiving payouts
+    /// @param payouts Amount of payout
     event WaterfallFunds(address[] recipients, uint256[] payouts);
 
     /// Emitted after non-waterfall'd tokens are recovered to a recipient
-    /// @param nonWaterfallToken x
-    /// @param recipient x
-    /// @param amount x
+    /// @param nonWaterfallToken Recovered token (cannot be waterfall token)
+    /// @param recipient Address receiving recovered token
+    /// @param amount Amount of recovered token
     event RecoverNonWaterfallFunds(
         address nonWaterfallToken, address recipient, uint256 amount
     );
@@ -83,6 +81,7 @@ contract WaterfallModule is Clone {
         return _getArgUint256Array(52, uint64(numTranches()));
     }
 
+    /// Amount of distributed waterfall token
     uint256 public distributedFunds;
 
     /// -----------------------------------------------------------------------
@@ -106,6 +105,7 @@ contract WaterfallModule is Clone {
     /*     emit ReceiveETH(msg.value); */
     /* } */
 
+    /// Waterfalls target token inside the contract to next-in-line recipients
     function waterfallFunds() external payable {
         /// checks
 
@@ -184,8 +184,8 @@ contract WaterfallModule is Clone {
                     // tranche's threshold and is then set to each preceding
                     // threshold (which are monotonically increasing)
                     _payouts[i] = _threshold - _paidOut;
-
                     _paidOut = _threshold;
+
                     // shouldn't overflow
                     ++i;
                 }
@@ -194,7 +194,7 @@ contract WaterfallModule is Clone {
             unchecked {
                 // shouldn't overflow
                 _payoutAddresses[i] = recipients[_firstPayoutTranche + i];
-                // shouldn't overflow since _paidOut = last tranche threshold,
+                // shouldn't underflow since _paidOut = last tranche threshold,
                 // which should be <= _endingDistributedFunds by construction
                 _payouts[i] = _endingDistributedFunds - _paidOut;
             }
@@ -222,6 +222,9 @@ contract WaterfallModule is Clone {
         emit WaterfallFunds(_payoutAddresses, _payouts);
     }
 
+    /// Recover non-waterfall'd tokens to a recipient
+    /// @param nonWaterfallToken Token to recover (cannot be waterfall token)
+    /// @param recipient Address to receive recovered token
     function recoverNonWaterfallFunds(
         address nonWaterfallToken,
         address recipient
@@ -231,10 +234,12 @@ contract WaterfallModule is Clone {
     {
         /// checks
 
+        // revert if caller tries to recover waterfall token
         if (nonWaterfallToken == token()) {
             revert InvalidTokenRecovery_WaterfallToken();
         }
 
+        // ensure txn recipient is a valid waterfall recipient
         (address[] memory recipients,) = getTranches();
         bool validRecipient = false;
         uint256 _numTranches = numTranches();
@@ -256,6 +261,7 @@ contract WaterfallModule is Clone {
 
         /// interactions
 
+        // recover non-target token
         uint256 amount;
         if (nonWaterfallToken == ETH_ADDRESS) {
             amount = address(this).balance;
@@ -272,6 +278,9 @@ contract WaterfallModule is Clone {
     /// functions - view & pure
     /// -----------------------------------------------------------------------
 
+    /// Return tranches in an unpacked form
+    /// @return recipients Addresses to waterfall payments to
+    /// @return thresholds Absolute payment thresholds for waterfall recipients
     function getTranches()
         public
         pure

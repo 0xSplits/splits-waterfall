@@ -11,6 +11,7 @@ import {ClonesWithImmutableArgs} from
 /// @dev This factory uses our own extension of clones-with-immutable-args to avoid
 /// `DELEGATECALL` inside `receive()` to accept hard gas-capped `sends` & `transfers`
 /// for maximum backwards composability.
+/// This contract uses token = address(0) to refer to ETH.
 contract WaterfallModuleFactory {
     /// -----------------------------------------------------------------------
     /// errors
