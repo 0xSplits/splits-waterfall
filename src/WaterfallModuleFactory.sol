@@ -141,11 +141,7 @@ contract WaterfallModuleFactory {
         // copy recipients & thresholds into storage
         i = 0;
         uint256[] memory tranches = new uint256[](recipientsLength);
-        uint256 loopLength;
-        unchecked {
-            loopLength = recipientsLength - 1;
-        }
-        for (; i < loopLength;) {
+        for (; i < thresholdsLength;) {
             tranches[i] =
                 (thresholds[i] << ADDRESS_BITS) | uint256(uint160(recipients[i]));
             unchecked {
