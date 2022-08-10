@@ -5,9 +5,7 @@ import {WaterfallModule} from "./WaterfallModule.sol";
 import {ClonesWithImmutableArgs} from
     "clones-with-immutable-args/ClonesWithImmutableArgs.sol";
 
-// TODO: natspec
-
-/// @title WaterfallModule
+/// @title WaterfallModuleFactory
 /// @author 0xSplits
 /// @notice A factory contract for cheaply deploying WaterfallModules.
 /// @dev This factory uses our own extension of clones-with-immutable-args to avoid
@@ -21,14 +19,14 @@ contract WaterfallModuleFactory {
     /// Invalid number of recipients, must have at least 2
     error InvalidWaterfall__TooFewRecipients();
 
-    /// Invalid recipient & threshold lengths; recipients must have one more entry
-    /// than thresholds
+    /// Invalid recipient & threshold lengths; recipients must have one more
+    /// entry than thresholds
     error InvalidWaterfall__RecipientsAndThresholdsLengthMismatch();
 
     /// Thresholds must be positive
     error InvalidWaterfall__ZeroThreshold();
 
-    /// Invalid threshold at `index` (thresholds must be < 2^96)
+    /// Invalid threshold at `index`; must be < 2^96
     /// @param index Index of too-large threshold
     error InvalidWaterfall__ThresholdTooLarge(uint256 index);
 
@@ -50,7 +48,8 @@ contract WaterfallModuleFactory {
     /// @param waterfallModule Address of newly created WaterfallModule clone
     /// @param token Address of ERC20 to waterfall (0x0 used for ETH)
     /// @param recipients Addresses to waterfall payments to
-    /// @param thresholds Absolute thresholds for payment waterfall
+    /// @param thresholds Absolute payment thresholds for waterfall recipients
+    /// (last recipient has no threshold & receives all residual flows)
     event CreateWaterfallModule(
         address indexed waterfallModule,
         address token,
@@ -64,6 +63,7 @@ contract WaterfallModuleFactory {
 
     uint256 internal constant ADDRESS_BITS = 160;
 
+    /// WaterfallModule implementation address
     WaterfallModule public immutable wmImpl;
 
     /// -----------------------------------------------------------------------
@@ -82,10 +82,11 @@ contract WaterfallModuleFactory {
     /// functions - public & external
     /// -----------------------------------------------------------------------
 
-    /// Creates new WaterfallModule clone
+    /// Create a new WaterfallModule clone
     /// @param token Address of ERC20 to waterfall (0x0 used for ETH)
     /// @param recipients Addresses to waterfall payments to
-    /// @param thresholds Absolute thresholds for payment waterfall
+    /// @param thresholds Absolute payment thresholds for waterfall recipients
+    /// (last recipient has no threshold & receives all residual flows)
     /// @return wm Address of new WaterfallModule clone
     function createWaterfallModule(
         address token,
