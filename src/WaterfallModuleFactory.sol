@@ -154,7 +154,10 @@ contract WaterfallModuleFactory {
         // recipients array is one longer than thresholds array; set last item after loop
         tranches[i] = uint256(uint160(recipients[i]));
 
-        bytes memory data = abi.encodePacked(token, recipientsLength, tranches);
+        // recipientsLength won't realistically be > 2^64; deployed contract
+        // would exceed contract size limits
+        bytes memory data =
+            abi.encodePacked(token, uint64(recipientsLength), tranches);
         wm = WaterfallModule(address(wmImpl).clone(data));
         emit CreateWaterfallModule(address(wm), token, recipients, thresholds);
     }

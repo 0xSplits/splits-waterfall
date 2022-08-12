@@ -58,9 +58,15 @@ contract WaterfallModule is Clone {
     /// -----------------------------------------------------------------------
 
     address internal constant ETH_ADDRESS = address(0);
+    uint256 internal constant ONE_WORD = 32;
     uint256 internal constant THRESHOLD_BITS = 96;
     uint256 internal constant ADDRESS_BITS = 160;
     uint256 internal constant ADDRESS_BITMASK = uint256(~0 >> THRESHOLD_BITS);
+
+    // 20 = address (20 bytes)
+    uint256 internal constant NUM_TRANCHES_OFFSET = 20;
+    // 28 = NUM_TRANCHES_OFFSET (20) + uint64 (8 bytes)
+    uint256 internal constant TRANCHES_OFFSET = 28;
 
     /// Address of ERC20 to waterfall (0x0 used for ETH)
     /// @dev equivalent to address public immutable token;
@@ -69,16 +75,10 @@ contract WaterfallModule is Clone {
     }
 
     /// Number of waterfall tranches
-    /// @dev equivalent to uint256 internal immutable numTranches;
+    /// @dev equivalent to uint64 internal immutable numTranches;
+    /// clones-with-immutable-args limits uint256[] array length to uint64
     function numTranches() internal pure returns (uint256) {
-        // TODO: use _getArgUint64 ?
-        return _getArgUint256(20);
-    }
-
-    /// Waterfall tranches (packed form)
-    /// @dev equivalent to uint256[] internal immutable tranches;
-    function _tranches() internal pure returns (uint256[] memory) {
-        return _getArgUint256Array(52, uint64(numTranches()));
+        return uint256(_getArgUint64(NUM_TRANCHES_OFFSET));
     }
 
     /// Amount of distributed waterfall token
@@ -89,6 +89,7 @@ contract WaterfallModule is Clone {
     /// -----------------------------------------------------------------------
 
     // solhint-disable-next-line no-empty-blocks
+    /// clone implementation doesn't use constructor
     constructor() {}
 
     /// -----------------------------------------------------------------------
@@ -312,7 +313,7 @@ contract WaterfallModule is Clone {
     function _getTranche(uint256 i) internal pure returns (uint256) {
         unchecked {
             // shouldn't overflow
-            return _getArgUint256(52 + i * 32);
+            return _getArgUint256(TRANCHES_OFFSET + i * ONE_WORD);
         }
     }
 }
