@@ -10,7 +10,7 @@ contract WaterfallModuleFactoryScript is Script {
     function run() public {
         vm.startBroadcast();
 
-        WaterfallModuleFactory wmf = new WaterfallModuleFactory();
+        new WaterfallModuleFactory();
 
         vm.stopBroadcast();
     }
