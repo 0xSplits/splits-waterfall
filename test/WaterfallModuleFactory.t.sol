@@ -10,10 +10,6 @@ import {WaterfallModule} from "../src/WaterfallModule.sol";
 import {WaterfallReentrancy} from "./WaterfallReentrancy.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 
-// TODO: add fuzzing testing
-// https://book.getfoundry.sh/reference/forge-std/bound
-// https://github.com/PraneshASP/forge-template/blob/main/src/test/utils/Utils.sol
-
 contract WaterfallModuleFactoryTest is Test {
     event CreateWaterfallModule(
         address indexed waterfallModule,
@@ -105,7 +101,7 @@ contract WaterfallModuleFactoryTest is Test {
             WaterfallModuleFactory.InvalidWaterfall__TooFewRecipients.selector
         );
         wmf.createWaterfallModule(
-            ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+            address(mERC20), _trancheRecipients, _trancheThresholds
         );
     }
 
@@ -131,7 +127,7 @@ contract WaterfallModuleFactoryTest is Test {
                 .selector
         );
         wmf.createWaterfallModule(
-            ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+            address(mERC20), _trancheRecipients, _trancheThresholds
         );
     }
 
@@ -146,6 +142,13 @@ contract WaterfallModuleFactoryTest is Test {
         );
         wmf.createWaterfallModule(
             ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+        );
+
+        vm.expectRevert(
+            WaterfallModuleFactory.InvalidWaterfall__ZeroThreshold.selector
+        );
+        wmf.createWaterfallModule(
+            address(mERC20), _trancheRecipients, _trancheThresholds
         );
     }
 
@@ -173,7 +176,7 @@ contract WaterfallModuleFactoryTest is Test {
             )
         );
         wmf.createWaterfallModule(
-            ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+            address(mERC20), _trancheRecipients, _trancheThresholds
         );
     }
 
@@ -201,7 +204,7 @@ contract WaterfallModuleFactoryTest is Test {
             )
         );
         wmf.createWaterfallModule(
-            ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+            address(mERC20), _trancheRecipients, _trancheThresholds
         );
 
         _trancheThresholds[1] = _trancheThresholds[0] + 1;
@@ -218,6 +221,186 @@ contract WaterfallModuleFactoryTest is Test {
     /// -----------------------------------------------------------------------
     /// correctness tests - fuzzing
     /// -----------------------------------------------------------------------
+
+    function testCan_createWaterfallModules(uint8 _numTranches) public {
+        uint256 numTranches = bound(_numTranches, 2, type(uint8).max);
+
+        (
+            address[] memory _trancheRecipients, uint256[] memory _trancheThresholds
+        ) = generateTranches(numTranches);
+
+        wmf.createWaterfallModule(
+            ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+        );
+
+        wmf.createWaterfallModule(
+            address(mERC20), _trancheRecipients, _trancheThresholds
+        );
+    }
+
+    function testCan_emitOnCreate(uint8 _numTranches) public {
+        uint256 numTranches = bound(_numTranches, 2, type(uint8).max);
+
+        (
+            address[] memory _trancheRecipients, uint256[] memory _trancheThresholds
+        ) = generateTranches(numTranches);
+
+        // don't check deploy address
+        vm.expectEmit(false, true, true, true);
+        emit CreateWaterfallModule(
+            address(0xdead), ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+            );
+        wmf.createWaterfallModule(
+            ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+        );
+
+        // don't check deploy address
+        vm.expectEmit(false, true, true, true);
+        emit CreateWaterfallModule(
+            address(0xdead),
+            address(mERC20),
+            _trancheRecipients,
+            _trancheThresholds
+            );
+        wmf.createWaterfallModule(
+            address(mERC20), _trancheRecipients, _trancheThresholds
+        );
+    }
+
+    function testCannot_createWithMismatchedLengths(
+        uint8 _numRecipients,
+        uint8 _numThresholds
+    )
+        public
+    {
+        vm.assume(_numRecipients >= 2);
+        vm.assume(_numThresholds >= 1);
+        vm.assume(_numRecipients - 1 != _numThresholds);
+
+        address[] memory _trancheRecipients =
+            generateTrancheRecipients(_numRecipients);
+        uint256[] memory _trancheThresholds =
+            generateTrancheThresholds(_numThresholds);
+
+        vm.expectRevert(
+            WaterfallModuleFactory
+                .InvalidWaterfall__RecipientsAndThresholdsLengthMismatch
+                .selector
+        );
+        wmf.createWaterfallModule(
+            ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+        );
+
+        vm.expectRevert(
+            WaterfallModuleFactory
+                .InvalidWaterfall__RecipientsAndThresholdsLengthMismatch
+                .selector
+        );
+        wmf.createWaterfallModule(
+            address(mERC20), _trancheRecipients, _trancheThresholds
+        );
+    }
+
+    function testCannot_createWithZeroThreshold(uint8 _numTranches) public {
+        uint256 numTranches = bound(_numTranches, 2, type(uint8).max);
+
+        (
+            address[] memory _trancheRecipients, uint256[] memory _trancheThresholds
+        ) = generateTranches(numTranches);
+        _trancheThresholds[0] = 0;
+
+        vm.expectRevert(
+            WaterfallModuleFactory.InvalidWaterfall__ZeroThreshold.selector
+        );
+        wmf.createWaterfallModule(
+            ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+        );
+
+        vm.expectRevert(
+            WaterfallModuleFactory.InvalidWaterfall__ZeroThreshold.selector
+        );
+        wmf.createWaterfallModule(
+            address(mERC20), _trancheRecipients, _trancheThresholds
+        );
+    }
+
+    function testCannot_createWithTooLargeThreshold(
+        uint8 _numTranches,
+        uint8 _largeThresholdIndex,
+        uint160 _largeThreshold
+    )
+        public
+    {
+        uint256 numTranches = bound(_numTranches, 2, type(uint8).max);
+        uint256 largeThresholdIndex =
+            bound(_largeThresholdIndex, 0, numTranches - 2);
+        vm.assume(_largeThreshold > 0);
+        uint256 largeThreshold = _largeThreshold << 96;
+
+        (
+            address[] memory _trancheRecipients, uint256[] memory _trancheThresholds
+        ) = generateTranches(numTranches);
+
+        _trancheThresholds[largeThresholdIndex] = largeThreshold;
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                WaterfallModuleFactory.InvalidWaterfall__ThresholdTooLarge.selector,
+                largeThresholdIndex
+            )
+        );
+        wmf.createWaterfallModule(
+            ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                WaterfallModuleFactory.InvalidWaterfall__ThresholdTooLarge.selector,
+                largeThresholdIndex
+            )
+        );
+        wmf.createWaterfallModule(
+            address(mERC20), _trancheRecipients, _trancheThresholds
+        );
+    }
+
+    function testCannot_createWithThresholdOutOfOrder(
+        uint8 _numTranches,
+        uint8 _swapIndex
+    )
+        public
+    {
+        uint256 numTranches = bound(_numTranches, 3, type(uint8).max);
+        uint256 swapIndex = bound(_swapIndex, 1, numTranches - 2);
+
+        (
+            address[] memory _trancheRecipients, uint256[] memory _trancheThresholds
+        ) = generateTranches(numTranches);
+
+        uint256 _temp = _trancheThresholds[swapIndex];
+        _trancheThresholds[swapIndex] = _trancheThresholds[swapIndex - 1];
+        _trancheThresholds[swapIndex - 1] = _temp;
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                WaterfallModuleFactory.InvalidWaterfall__ThresholdsOutOfOrder.selector,
+                swapIndex
+            )
+        );
+        wmf.createWaterfallModule(
+            ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                WaterfallModuleFactory.InvalidWaterfall__ThresholdsOutOfOrder.selector,
+                swapIndex
+            )
+        );
+        wmf.createWaterfallModule(
+            address(mERC20), _trancheRecipients, _trancheThresholds
+        );
+    }
 
     /// -----------------------------------------------------------------------
     /// helper fns
