@@ -266,7 +266,8 @@ contract WaterfallModule is Clone {
         uint256 _endingDistributedFunds;
         unchecked {
             // shouldn't overflow
-            _endingDistributedFunds = _startingDistributedFunds - fundsPendingWithdrawal
+            _endingDistributedFunds = _startingDistributedFunds
+                - fundsPendingWithdrawal
                 +
                 // recognizes 0x0 as ETH
                 // shouldn't need to worry about re-entrancy from ERC20 view fn

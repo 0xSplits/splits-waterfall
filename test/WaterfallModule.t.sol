@@ -393,6 +393,54 @@ contract WaterfallModuleTest is Test {
         assertEq(address(0).balance, 0 ether);
     }
 
+    function testCan_waterfallToPullFlow() public {
+        // test eth
+        address(wmETH).safeTransferETH(10 ether);
+        wmETH.waterfallFunds(1);
+
+        assertEq(address(wmETH).balance, 10 ether);
+        assertEq(address(0).balance, 0 ether);
+        assertEq(address(1).balance, 0 ether);
+
+        assertEq(wmETH.getPullBalance(address(0)), 1 ether);
+        assertEq(wmETH.getPullBalance(address(1)), 9 ether);
+
+        wmETH.withdraw(address(0));
+
+        assertEq(address(wmETH).balance, 9 ether);
+        assertEq(address(0).balance, 1 ether);
+        assertEq(address(1).balance, 0 ether);
+
+        wmETH.withdraw(address(1));
+
+        assertEq(address(wmETH).balance, 0 ether);
+        assertEq(address(0).balance, 1 ether);
+        assertEq(address(1).balance, 9 ether);
+
+        // test erc20
+        ERC20(mERC20).safeTransfer(address(wmERC20), 10 ether);
+        wmERC20.waterfallFunds(1);
+
+        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 10 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(0)), 0 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(1)), 0 ether);
+
+        assertEq(wmERC20.getPullBalance(address(0)), 1 ether);
+        assertEq(wmERC20.getPullBalance(address(1)), 9 ether);
+
+        wmERC20.withdraw(address(0));
+
+        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 9 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(0)), 1 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(1)), 0 ether);
+
+        wmERC20.withdraw(address(1));
+
+        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 0 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(0)), 1 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(1)), 9 ether);
+    }
+
     /// -----------------------------------------------------------------------
     /// correctness tests - fuzzing
     /// -----------------------------------------------------------------------
