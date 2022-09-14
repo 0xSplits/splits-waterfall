@@ -95,6 +95,9 @@ contract WaterfallModule is Clone {
     /// Amount of distributed waterfall token
     uint256 public distributedFunds;
 
+    /// Amount of active balance set aside for pulls
+    uint256 public fundsPendingWithdrawal;
+
     /// -----------------------------------------------------------------------
     /// constructor
     /// -----------------------------------------------------------------------
@@ -185,6 +188,7 @@ contract WaterfallModule is Clone {
     function withdraw(address account) external {
         address _token = token();
         uint256 tokenAmount = pullBalances[account];
+        fundsPendingWithdrawal -= tokenAmount;
         pullBalances[account] = 0;
         if (_token == ETH_ADDRESS) {
             account.safeTransferETH(tokenAmount);
@@ -262,7 +266,7 @@ contract WaterfallModule is Clone {
         uint256 _endingDistributedFunds;
         unchecked {
             // shouldn't overflow
-            _endingDistributedFunds = _startingDistributedFunds
+            _endingDistributedFunds = _startingDistributedFunds - fundsPendingWithdrawal
                 +
                 // recognizes 0x0 as ETH
                 // shouldn't need to worry about re-entrancy from ERC20 view fn
@@ -354,6 +358,7 @@ contract WaterfallModule is Clone {
         for (uint256 i = 0; i < _payoutsLength;) {
             if (shouldUsePullFlow == 1) {
                 pullBalances[_payoutAddresses[i]] = _payouts[i];
+                fundsPendingWithdrawal += _payouts[i];
             } else {
                 if (_token == ETH_ADDRESS) {
                     (_payoutAddresses[i]).safeTransferETH(_payouts[i]);
