@@ -23,7 +23,9 @@ contract WaterfallModuleTest is Test {
 
     event ReceiveETH(uint256 amount);
 
-    event WaterfallFunds(address[] recipients, uint256[] payouts);
+    event WaterfallFunds(
+        address[] recipients, uint256[] payouts, uint256 shouldUsePullFlow
+    );
 
     event RecoverNonWaterfallFunds(
         address nonWaterfallToken, address recipient, uint256 amount
@@ -224,7 +226,7 @@ contract WaterfallModuleTest is Test {
         recipients[0] = address(0);
         uint256[] memory payouts = new uint256[](1);
         payouts[0] = 0 ether;
-        emit WaterfallFunds(recipients, payouts);
+        emit WaterfallFunds(recipients, payouts, 0);
         wmETH.waterfallFunds();
     }
 
@@ -260,13 +262,13 @@ contract WaterfallModuleTest is Test {
         payouts[0] = 1 ether;
 
         vm.expectEmit(true, true, true, true);
-        emit WaterfallFunds(recipients, payouts);
+        emit WaterfallFunds(recipients, payouts, 0);
         wmETH.waterfallFunds();
 
         ERC20(mERC20).safeTransfer(address(wmERC20), 1 ether);
 
         vm.expectEmit(true, true, true, true);
-        emit WaterfallFunds(recipients, payouts);
+        emit WaterfallFunds(recipients, payouts, 0);
         wmERC20.waterfallFunds();
     }
 
@@ -316,12 +318,12 @@ contract WaterfallModuleTest is Test {
 
         address(wmETH).safeTransferETH(2 ether);
         vm.expectEmit(true, true, true, true);
-        emit WaterfallFunds(recipients, payouts);
+        emit WaterfallFunds(recipients, payouts, 0);
         wmETH.waterfallFunds();
 
         ERC20(mERC20).safeTransfer(address(wmERC20), 2 ether);
         vm.expectEmit(true, true, true, true);
-        emit WaterfallFunds(recipients, payouts);
+        emit WaterfallFunds(recipients, payouts, 0);
         wmERC20.waterfallFunds();
     }
 
