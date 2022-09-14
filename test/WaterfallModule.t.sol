@@ -441,6 +441,236 @@ contract WaterfallModuleTest is Test {
         assertEq(ERC20(mERC20).balanceOf(address(1)), 9 ether);
     }
 
+    function testCan_waterfallPushAndPull() public {
+        // test eth
+        address(wmETH).safeTransferETH(0.5 ether);
+        assertEq(address(wmETH).balance, 0.5 ether);
+
+        wmETH.waterfallFunds(0);
+
+        assertEq(address(wmETH).balance, 0 ether);
+        assertEq(address(0).balance, 0.5 ether);
+        assertEq(address(1).balance, 0 ether);
+
+        assertEq(wmETH.getPullBalance(address(0)), 0 ether);
+        assertEq(wmETH.getPullBalance(address(1)), 0 ether);
+
+        address(wmETH).safeTransferETH(1 ether);
+        assertEq(address(wmETH).balance, 1 ether);
+
+        wmETH.waterfallFunds(1);
+
+        assertEq(address(wmETH).balance, 1 ether);
+        assertEq(address(0).balance, 0.5 ether);
+        assertEq(address(1).balance, 0 ether);
+
+        assertEq(wmETH.getPullBalance(address(0)), 0.5 ether);
+        assertEq(wmETH.getPullBalance(address(1)), 0.5 ether);
+
+        wmETH.waterfallFunds(1);
+
+        assertEq(address(wmETH).balance, 1 ether);
+        assertEq(address(0).balance, 0.5 ether);
+        assertEq(address(1).balance, 0 ether);
+
+        assertEq(wmETH.getPullBalance(address(0)), 0.5 ether);
+        assertEq(wmETH.getPullBalance(address(1)), 0.5 ether);
+
+        address(wmETH).safeTransferETH(1 ether);
+        assertEq(address(wmETH).balance, 2 ether);
+
+        wmETH.waterfallFunds(0);
+
+        assertEq(address(wmETH).balance, 1 ether);
+        assertEq(address(0).balance, 0.5 ether);
+        assertEq(address(1).balance, 1 ether);
+
+        assertEq(wmETH.getPullBalance(address(0)), 0.5 ether);
+        assertEq(wmETH.getPullBalance(address(1)), 0.5 ether);
+
+        wmETH.withdraw(address(0));
+
+        assertEq(address(wmETH).balance, 0.5 ether);
+        assertEq(address(0).balance, 1 ether);
+        assertEq(address(1).balance, 1 ether);
+
+        assertEq(wmETH.getPullBalance(address(0)), 0 ether);
+        assertEq(wmETH.getPullBalance(address(1)), 0.5 ether);
+
+        wmETH.withdraw(address(1));
+
+        assertEq(address(wmETH).balance, 0 ether);
+        assertEq(address(0).balance, 1 ether);
+        assertEq(address(1).balance, 1.5 ether);
+
+        assertEq(wmETH.getPullBalance(address(0)), 0 ether);
+        assertEq(wmETH.getPullBalance(address(1)), 0 ether);
+
+        // test erc20
+        ERC20(mERC20).safeTransfer(address(wmERC20), 0.5 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 0.5 ether);
+
+        wmERC20.waterfallFunds(0);
+
+        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 0 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(0)), 0.5 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(1)), 0 ether);
+
+        assertEq(wmERC20.getPullBalance(address(0)), 0 ether);
+        assertEq(wmERC20.getPullBalance(address(1)), 0 ether);
+
+        ERC20(mERC20).safeTransfer(address(wmERC20), 1 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 1 ether);
+
+        wmERC20.waterfallFunds(1);
+
+        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 1 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(0)), 0.5 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(1)), 0 ether);
+
+        assertEq(wmERC20.getPullBalance(address(0)), 0.5 ether);
+        assertEq(wmERC20.getPullBalance(address(1)), 0.5 ether);
+
+        wmERC20.waterfallFunds(1);
+
+        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 1 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(0)), 0.5 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(1)), 0 ether);
+
+        assertEq(wmERC20.getPullBalance(address(0)), 0.5 ether);
+        assertEq(wmERC20.getPullBalance(address(1)), 0.5 ether);
+
+        ERC20(mERC20).safeTransfer(address(wmERC20), 1 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 2 ether);
+
+        wmERC20.waterfallFunds(0);
+
+        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 1 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(0)), 0.5 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(1)), 1 ether);
+
+        assertEq(wmERC20.getPullBalance(address(0)), 0.5 ether);
+        assertEq(wmERC20.getPullBalance(address(1)), 0.5 ether);
+
+        wmERC20.withdraw(address(0));
+
+        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 0.5 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(0)), 1 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(1)), 1 ether);
+
+        assertEq(wmERC20.getPullBalance(address(0)), 0 ether);
+        assertEq(wmERC20.getPullBalance(address(1)), 0.5 ether);
+
+        wmERC20.withdraw(address(1));
+
+        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 0 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(0)), 1 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(1)), 1.5 ether);
+
+        assertEq(wmERC20.getPullBalance(address(0)), 0 ether);
+        assertEq(wmERC20.getPullBalance(address(1)), 0 ether);
+    }
+
+    function testCan_waterfallPullNoMultiWithdraw() public {
+        // test eth
+        address(wmETH).safeTransferETH(3 ether);
+        assertEq(address(wmETH).balance, 3 ether);
+
+        wmETH.waterfallFunds(1);
+
+        assertEq(address(wmETH).balance, 3 ether);
+        assertEq(address(0).balance, 0 ether);
+        assertEq(address(1).balance, 0 ether);
+
+        assertEq(wmETH.getPullBalance(address(0)), 1 ether);
+        assertEq(wmETH.getPullBalance(address(1)), 2 ether);
+
+        wmETH.withdraw(address(0));
+
+        assertEq(address(wmETH).balance, 2 ether);
+        assertEq(address(0).balance, 1 ether);
+        assertEq(address(1).balance, 0 ether);
+
+        assertEq(wmETH.getPullBalance(address(0)), 0 ether);
+        assertEq(wmETH.getPullBalance(address(1)), 2 ether);
+
+        wmETH.withdraw(address(0));
+
+        assertEq(address(wmETH).balance, 2 ether);
+        assertEq(address(0).balance, 1 ether);
+        assertEq(address(1).balance, 0 ether);
+
+        assertEq(wmETH.getPullBalance(address(0)), 0 ether);
+        assertEq(wmETH.getPullBalance(address(1)), 2 ether);
+
+        wmETH.withdraw(address(1));
+
+        assertEq(address(wmETH).balance, 0 ether);
+        assertEq(address(0).balance, 1 ether);
+        assertEq(address(1).balance, 2 ether);
+
+        assertEq(wmETH.getPullBalance(address(0)), 0 ether);
+        assertEq(wmETH.getPullBalance(address(1)), 0 ether);
+
+        wmETH.withdraw(address(1));
+
+        assertEq(address(wmETH).balance, 0 ether);
+        assertEq(address(0).balance, 1 ether);
+        assertEq(address(1).balance, 2 ether);
+
+        assertEq(wmETH.getPullBalance(address(0)), 0 ether);
+        assertEq(wmETH.getPullBalance(address(1)), 0 ether);
+
+        // test erc20
+        ERC20(mERC20).safeTransfer(address(wmERC20), 3 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 3 ether);
+
+        wmERC20.waterfallFunds(1);
+
+        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 3 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(0)), 0 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(1)), 0 ether);
+
+        assertEq(wmERC20.getPullBalance(address(0)), 1 ether);
+        assertEq(wmERC20.getPullBalance(address(1)), 2 ether);
+
+        wmERC20.withdraw(address(0));
+
+        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 2 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(0)), 1 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(1)), 0 ether);
+
+        assertEq(wmERC20.getPullBalance(address(0)), 0 ether);
+        assertEq(wmERC20.getPullBalance(address(1)), 2 ether);
+
+        wmERC20.withdraw(address(0));
+
+        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 2 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(0)), 1 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(1)), 0 ether);
+
+        assertEq(wmERC20.getPullBalance(address(0)), 0 ether);
+        assertEq(wmERC20.getPullBalance(address(1)), 2 ether);
+
+        wmERC20.withdraw(address(1));
+
+        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 0 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(0)), 1 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(1)), 2 ether);
+
+        assertEq(wmERC20.getPullBalance(address(0)), 0 ether);
+        assertEq(wmERC20.getPullBalance(address(1)), 0 ether);
+
+        wmERC20.withdraw(address(1));
+
+        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 0 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(0)), 1 ether);
+        assertEq(ERC20(mERC20).balanceOf(address(1)), 2 ether);
+
+        assertEq(wmERC20.getPullBalance(address(0)), 0 ether);
+        assertEq(wmERC20.getPullBalance(address(1)), 0 ether);
+    }
+
     /// -----------------------------------------------------------------------
     /// correctness tests - fuzzing
     /// -----------------------------------------------------------------------
