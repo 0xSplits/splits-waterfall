@@ -362,7 +362,7 @@ contract WaterfallModule is Clone {
         // when later external calls fail (bc balance is emptied early)
         for (uint256 i = 0; i < _payoutsLength;) {
             if (pullFlowFlag != PUSH) {
-                pullBalances[_payoutAddresses[i]] = _payouts[i];
+                pullBalances[_payoutAddresses[i]] += _payouts[i];
                 _memoryFundsPendingWithdrawal += _payouts[i];
             } else if (_token == ETH_ADDRESS) {
                 (_payoutAddresses[i]).safeTransferETH(_payouts[i]);
