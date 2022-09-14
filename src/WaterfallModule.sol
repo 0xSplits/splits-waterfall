@@ -43,9 +43,9 @@ contract WaterfallModule is Clone {
     /// Emitted after funds are waterfall'd to recipients
     /// @param recipients Addresses receiving payouts
     /// @param payouts Amount of payout
-    /// @param shouldUsePullFlow boolean flag for pushing funds to recipients or storing for pulling
+    /// @param pullFlowFlag Flag for pushing funds to recipients or storing for pulling
     event WaterfallFunds(
-        address[] recipients, uint256[] payouts, uint256 shouldUsePullFlow
+        address[] recipients, uint256[] payouts, uint256 pullFlowFlag
     );
 
     /// Emitted after non-waterfall'd tokens are recovered to a recipient
@@ -78,6 +78,7 @@ contract WaterfallModule is Clone {
 
     /// @notice mapping to account balances for pulling
     mapping(address => uint256) internal pullBalances;
+    uint256 internal constant PUSH = 0;
 
     /// Address of ERC20 to waterfall (0x0 used for ETH)
     /// @dev equivalent to address public immutable token;
@@ -122,11 +123,11 @@ contract WaterfallModule is Clone {
 
     /// Waterfalls target token inside the contract to next-in-line recipients
     function waterfallFunds() external payable {
-        _waterfallFunds(0);
+        _waterfallFunds(PUSH);
     }
 
-    function waterfallFunds(uint256 shouldUsePullFlow) external payable {
-        _waterfallFunds(shouldUsePullFlow);
+    function waterfallFunds(uint256 pullFlowFlag) external payable {
+        _waterfallFunds(pullFlowFlag);
     }
 
     /// Recover non-waterfall'd tokens to a recipient
@@ -254,7 +255,7 @@ contract WaterfallModule is Clone {
     /// functions - private & internal
     /// -----------------------------------------------------------------------
 
-    function _waterfallFunds(uint256 shouldUsePullFlow) internal {
+    function _waterfallFunds(uint256 pullFlowFlag) internal {
         /// checks
 
         /// effects
@@ -264,10 +265,13 @@ contract WaterfallModule is Clone {
         address _token = token();
         uint256 _startingDistributedFunds = distributedFunds;
         uint256 _endingDistributedFunds;
+        uint256 _memoryFundsPendingWithdrawal = fundsPendingWithdrawal;
         unchecked {
             // shouldn't overflow
             _endingDistributedFunds = _startingDistributedFunds
-                - fundsPendingWithdrawal
+                -
+                // fundsPendingWithdrawal is always <= _startingDistributedFunds
+                _memoryFundsPendingWithdrawal
                 +
                 // recognizes 0x0 as ETH
                 // shouldn't need to worry about re-entrancy from ERC20 view fn
@@ -357,22 +361,25 @@ contract WaterfallModule is Clone {
         // earlier external calls may try to re-enter but will cause fn to revert
         // when later external calls fail (bc balance is emptied early)
         for (uint256 i = 0; i < _payoutsLength;) {
-            if (shouldUsePullFlow == 1) {
+            if (pullFlowFlag != PUSH) {
                 pullBalances[_payoutAddresses[i]] = _payouts[i];
-                fundsPendingWithdrawal += _payouts[i];
+                _memoryFundsPendingWithdrawal += _payouts[i];
+            } else if (_token == ETH_ADDRESS) {
+                (_payoutAddresses[i]).safeTransferETH(_payouts[i]);
             } else {
-                if (_token == ETH_ADDRESS) {
-                    (_payoutAddresses[i]).safeTransferETH(_payouts[i]);
-                } else {
-                    ERC20(_token).safeTransfer(_payoutAddresses[i], _payouts[i]);
-                }
+                ERC20(_token).safeTransfer(_payoutAddresses[i], _payouts[i]);
             }
+
             unchecked {
                 // shouldn't overflow
                 ++i;
             }
         }
 
-        emit WaterfallFunds(_payoutAddresses, _payouts, shouldUsePullFlow);
+        if (pullFlowFlag != PUSH) {
+            fundsPendingWithdrawal = _memoryFundsPendingWithdrawal;
+        }
+
+        emit WaterfallFunds(_payoutAddresses, _payouts, pullFlowFlag);
     }
 }
