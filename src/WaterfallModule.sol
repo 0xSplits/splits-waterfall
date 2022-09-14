@@ -79,6 +79,7 @@ contract WaterfallModule is Clone {
     /// @notice mapping to account balances for pulling
     mapping(address => uint256) internal pullBalances;
     uint256 internal constant PUSH = 0;
+    uint256 internal constant PULL = 1;
 
     /// Address of ERC20 to waterfall (0x0 used for ETH)
     /// @dev equivalent to address public immutable token;
@@ -126,8 +127,8 @@ contract WaterfallModule is Clone {
         _waterfallFunds(PUSH);
     }
 
-    function waterfallFunds(uint256 pullFlowFlag) external payable {
-        _waterfallFunds(pullFlowFlag);
+    function waterfallFundsPull() external payable {
+        _waterfallFunds(PULL);
     }
 
     /// Recover non-waterfall'd tokens to a recipient
@@ -361,7 +362,7 @@ contract WaterfallModule is Clone {
         // earlier external calls may try to re-enter but will cause fn to revert
         // when later external calls fail (bc balance is emptied early)
         for (uint256 i = 0; i < _payoutsLength;) {
-            if (pullFlowFlag != PUSH) {
+            if (pullFlowFlag == PULL) {
                 pullBalances[_payoutAddresses[i]] += _payouts[i];
                 _memoryFundsPendingWithdrawal += _payouts[i];
             } else if (_token == ETH_ADDRESS) {
@@ -376,7 +377,7 @@ contract WaterfallModule is Clone {
             }
         }
 
-        if (pullFlowFlag != PUSH) {
+        if (pullFlowFlag == PULL) {
             fundsPendingWithdrawal = _memoryFundsPendingWithdrawal;
         }
 
