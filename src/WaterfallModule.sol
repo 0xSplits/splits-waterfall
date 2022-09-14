@@ -44,7 +44,9 @@ contract WaterfallModule is Clone {
     /// @param recipients Addresses receiving payouts
     /// @param payouts Amount of payout
     /// @param shouldUsePullFlow boolean flag for pushing funds to recipients or storing for pulling
-    event WaterfallFunds(address[] recipients, uint256[] payouts, uint256 shouldUsePullFlow);
+    event WaterfallFunds(
+        address[] recipients, uint256[] payouts, uint256 shouldUsePullFlow
+    );
 
     /// Emitted after non-waterfall'd tokens are recovered to a recipient
     /// @param nonWaterfallToken Recovered token (cannot be waterfall token)
@@ -57,9 +59,7 @@ contract WaterfallModule is Clone {
     /// Emitted after funds withdrawn using pull flow
     /// @param account Account withdrawing funds for
     /// @param amount Amount withdrawn
-    event Withdrawal(
-        address account, uint256 amount
-    );
+    event Withdrawal(address account, uint256 amount);
 
     /// -----------------------------------------------------------------------
     /// storage
@@ -182,10 +182,7 @@ contract WaterfallModule is Clone {
      * @notice Withdraw token balance for account `account`
      * @param account Address to withdraw on behalf of
      */
-    function withdraw(address account)
-        external
-        override
-    {
+    function withdraw(address account) external {
         address _token = token();
         uint256 tokenAmount = pullBalances[account];
         pullBalances[account] = 0;
@@ -197,7 +194,6 @@ contract WaterfallModule is Clone {
 
         emit Withdrawal(account, tokenAmount);
     }
-
 
     /// -----------------------------------------------------------------------
     /// functions - view & pure
@@ -239,11 +235,7 @@ contract WaterfallModule is Clone {
      * @param account Account to return balance for
      * @return Account's balance waterfall token
      */
-    function getPullBalance(address account)
-        external
-        view
-        returns (uint256)
-    {
+    function getPullBalance(address account) external view returns (uint256) {
         return pullBalances[account];
     }
 
