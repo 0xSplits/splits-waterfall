@@ -66,6 +66,10 @@ contract WaterfallModule is Clone {
     /// -----------------------------------------------------------------------
 
     address internal constant ETH_ADDRESS = address(0);
+
+    uint256 internal constant PUSH = 0;
+    uint256 internal constant PULL = 1;
+
     uint256 internal constant ONE_WORD = 32;
     uint256 internal constant THRESHOLD_BITS = 96;
     uint256 internal constant ADDRESS_BITS = 160;
@@ -75,11 +79,6 @@ contract WaterfallModule is Clone {
     uint256 internal constant NUM_TRANCHES_OFFSET = 20;
     // 28 = NUM_TRANCHES_OFFSET (20) + uint64 (8 bytes)
     uint256 internal constant TRANCHES_OFFSET = 28;
-
-    /// @notice mapping to account balances for pulling
-    mapping(address => uint256) internal pullBalances;
-    uint256 internal constant PUSH = 0;
-    uint256 internal constant PULL = 1;
 
     /// Address of ERC20 to waterfall (0x0 used for ETH)
     /// @dev equivalent to address public immutable token;
@@ -99,6 +98,9 @@ contract WaterfallModule is Clone {
 
     /// Amount of active balance set aside for pulls
     uint256 public fundsPendingWithdrawal;
+
+    /// @notice mapping to account balances for pulling
+    mapping(address => uint256) internal pullBalances;
 
     /// -----------------------------------------------------------------------
     /// constructor
