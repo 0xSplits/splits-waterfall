@@ -154,7 +154,7 @@ contract WaterfallModule is Clone {
         (address[] memory recipients,) = getTranches();
         bool validRecipient = false;
         uint256 _numTranches = numTranches();
-        for (uint256 i = 0; i < _numTranches;) {
+        for (uint256 i; i < _numTranches;) {
             if (recipients[i] == recipient) {
                 validRecipient = true;
                 break;
@@ -323,7 +323,7 @@ contract WaterfallModule is Clone {
             uint256 _paidOut = _startingDistributedFunds;
             uint256 _index;
             uint256 _threshold;
-            uint256 i = 0;
+            uint256 i; // = 0
             uint256 loopLength;
             unchecked {
                 // shouldn't underflow since _payoutsLength >= 1
@@ -363,7 +363,7 @@ contract WaterfallModule is Clone {
         // pay outs
         // earlier external calls may try to re-enter but will cause fn to revert
         // when later external calls fail (bc balance is emptied early)
-        for (uint256 i = 0; i < _payoutsLength;) {
+        for (uint256 i; i < _payoutsLength;) {
             if (pullFlowFlag == PULL) {
                 pullBalances[_payoutAddresses[i]] += _payouts[i];
                 _memoryFundsPendingWithdrawal += _payouts[i];
