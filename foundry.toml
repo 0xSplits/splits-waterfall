@@ -51,6 +51,10 @@ bytecode_hash = 'ipfs'
 sparse_mode = false
 build_info = false
 
+[rpc_endpoints]
+mainnet = "${MAINNET_RPC_URL}"
+goerli = "${GOERLI_RPC_URL}"
+
 [profile.default.rpc_storage_caching]
 chains = 'all'
 endpoints = 'all'
