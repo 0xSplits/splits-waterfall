@@ -94,10 +94,10 @@ contract WaterfallModule is Clone {
     }
 
     /// Amount of distributed waterfall token
-    uint256 public distributedFunds;
+    uint128 public distributedFunds;
 
     /// Amount of active balance set aside for pulls
-    uint256 public fundsPendingWithdrawal;
+    uint128 public fundsPendingWithdrawal;
 
     /// @notice mapping to account balances for pulling
     mapping(address => uint256) internal pullBalances;
@@ -192,7 +192,7 @@ contract WaterfallModule is Clone {
     function withdraw(address account) external {
         address _token = token();
         uint256 tokenAmount = pullBalances[account];
-        fundsPendingWithdrawal -= tokenAmount;
+        fundsPendingWithdrawal -= uint128( tokenAmount );
         pullBalances[account] = 0;
         if (_token == ETH_ADDRESS) {
             account.safeTransferETH(tokenAmount);
@@ -266,9 +266,9 @@ contract WaterfallModule is Clone {
         // load storage into memory
 
         address _token = token();
-        uint256 _startingDistributedFunds = distributedFunds;
+        uint256 _startingDistributedFunds = uint256( distributedFunds );
         uint256 _endingDistributedFunds;
-        uint256 _memoryFundsPendingWithdrawal = fundsPendingWithdrawal;
+        uint256 _memoryFundsPendingWithdrawal = uint256( fundsPendingWithdrawal );
         unchecked {
             // shouldn't overflow
             _endingDistributedFunds = _startingDistributedFunds
@@ -355,7 +355,7 @@ contract WaterfallModule is Clone {
                 _payouts[i] = _endingDistributedFunds - _paidOut;
             }
 
-            distributedFunds = _endingDistributedFunds;
+            distributedFunds = uint128( _endingDistributedFunds );
         }
 
         /// interactions
@@ -380,7 +380,7 @@ contract WaterfallModule is Clone {
         }
 
         if (pullFlowFlag == PULL) {
-            fundsPendingWithdrawal = _memoryFundsPendingWithdrawal;
+            fundsPendingWithdrawal = uint128( _memoryFundsPendingWithdrawal );
         }
 
         emit WaterfallFunds(_payoutAddresses, _payouts, pullFlowFlag);
