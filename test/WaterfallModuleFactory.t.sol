@@ -335,7 +335,7 @@ contract WaterfallModuleFactoryTest is Test {
         uint256 largeThresholdIndex =
             bound(_largeThresholdIndex, 0, numTranches - 2);
         vm.assume(_largeThreshold > 0);
-        uint256 largeThreshold = _largeThreshold << 96;
+        uint256 largeThreshold = uint256( _largeThreshold ) << 96;
 
         (
             address[] memory _trancheRecipients, uint256[] memory _trancheThresholds
