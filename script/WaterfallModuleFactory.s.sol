@@ -5,12 +5,11 @@ import "forge-std/Script.sol";
 import {WaterfallModuleFactory} from "../src/WaterfallModuleFactory.sol";
 
 contract WaterfallModuleFactoryScript is Script {
-    function setUp() public {}
+    function run() external {
+        uint256 privKey = vm.envUint("PRIVATE_KEY");
+        vm.startBroadcast(privKey);
 
-    function run() public {
-        vm.startBroadcast();
-
-        new WaterfallModuleFactory();
+        new WaterfallModuleFactory{salt: keccak256("0xSplits.waterfall.v1")}();
 
         vm.stopBroadcast();
     }
