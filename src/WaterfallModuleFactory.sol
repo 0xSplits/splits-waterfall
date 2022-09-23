@@ -93,10 +93,7 @@ contract WaterfallModuleFactory {
         address token,
         address[] calldata recipients,
         uint256[] calldata thresholds
-    )
-        external
-        returns (WaterfallModule wm)
-    {
+    ) external returns (WaterfallModule wm) {
         /// checks
 
         // cache lengths for re-use
@@ -144,8 +141,8 @@ contract WaterfallModuleFactory {
         i = 0;
         uint256[] memory tranches = new uint256[](recipientsLength);
         for (; i < thresholdsLength;) {
-            tranches[i] =
-                (thresholds[i] << ADDRESS_BITS) | uint256(uint160(recipients[i]));
+            tranches[i] = (thresholds[i] << ADDRESS_BITS)
+                | uint256(uint160(recipients[i]));
             unchecked {
                 // shouldn't overflow
                 ++i;

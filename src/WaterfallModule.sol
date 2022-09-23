@@ -142,10 +142,7 @@ contract WaterfallModule is Clone {
     function recoverNonWaterfallFunds(
         address nonWaterfallToken,
         address recipient
-    )
-        external
-        payable
-    {
+    ) external payable {
         /// checks
 
         // revert if caller tries to recover waterfall token
@@ -197,7 +194,7 @@ contract WaterfallModule is Clone {
         uint256 tokenAmount = pullBalances[account];
         unchecked {
             // shouldn't underflow; invariant: fundsPendingWithdrawal = sum(pullBalances)
-            fundsPendingWithdrawal -= uint128( tokenAmount );
+            fundsPendingWithdrawal -= uint128(tokenAmount);
         }
         pullBalances[account] = 0;
         if (_token == ETH_ADDRESS) {
@@ -272,23 +269,21 @@ contract WaterfallModule is Clone {
         // load storage into memory
 
         address _token = token();
-        uint256 _startingDistributedFunds = uint256( distributedFunds );
+        uint256 _startingDistributedFunds = uint256(distributedFunds);
         uint256 _endingDistributedFunds;
-        uint256 _memoryFundsPendingWithdrawal = uint256( fundsPendingWithdrawal );
+        uint256 _memoryFundsPendingWithdrawal = uint256(fundsPendingWithdrawal);
         unchecked {
             // shouldn't overflow
             _endingDistributedFunds = _startingDistributedFunds
-                -
-                // fundsPendingWithdrawal is always <= _startingDistributedFunds
-                _memoryFundsPendingWithdrawal
-                +
-                // recognizes 0x0 as ETH
-                // shouldn't need to worry about re-entrancy from ERC20 view fn
-                (
-                    _token == ETH_ADDRESS
-                        ? address(this).balance
-                        : ERC20(_token).balanceOf(address(this))
-                );
+            // fundsPendingWithdrawal is always <= _startingDistributedFunds
+            - _memoryFundsPendingWithdrawal
+            // recognizes 0x0 as ETH
+            // shouldn't need to worry about re-entrancy from ERC20 view fn
+            + (
+                _token == ETH_ADDRESS
+                    ? address(this).balance
+                    : ERC20(_token).balanceOf(address(this))
+            );
         }
 
         (address[] memory recipients, uint256[] memory thresholds) =
@@ -361,7 +356,7 @@ contract WaterfallModule is Clone {
                 _payouts[i] = _endingDistributedFunds - _paidOut;
             }
 
-            distributedFunds = uint128( _endingDistributedFunds );
+            distributedFunds = uint128(_endingDistributedFunds);
         }
 
         /// interactions
@@ -386,7 +381,7 @@ contract WaterfallModule is Clone {
         }
 
         if (pullFlowFlag == PULL) {
-            fundsPendingWithdrawal = uint128( _memoryFundsPendingWithdrawal );
+            fundsPendingWithdrawal = uint128(_memoryFundsPendingWithdrawal);
         }
 
         emit WaterfallFunds(_payoutAddresses, _payouts, pullFlowFlag);
