@@ -10,7 +10,7 @@ import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 /// @notice A maximally-composable waterfall contract allowing multiple
 /// recipients to receive preferential payments before residual funds flow to a
 /// final address.
-/// @dev /// Only one token can be waterfall'd for a given deployment. There is a
+/// @dev Only one token can be waterfall'd for a given deployment. There is a
 /// recovery method for non-target tokens sent by accident.
 /// This contract uses token = address(0) to refer to ETH.
 contract WaterfallModule is Clone {
@@ -43,7 +43,10 @@ contract WaterfallModule is Clone {
     /// Emitted after funds are waterfall'd to recipients
     /// @param recipients Addresses receiving payouts
     /// @param payouts Amount of payout
-    event WaterfallFunds(address[] recipients, uint256[] payouts);
+    /// @param pullFlowFlag Flag for pushing funds to recipients or storing for pulling
+    event WaterfallFunds(
+        address[] recipients, uint256[] payouts, uint256 pullFlowFlag
+    );
 
     /// Emitted after non-waterfall'd tokens are recovered to a recipient
     /// @param nonWaterfallToken Recovered token (cannot be waterfall token)
@@ -53,11 +56,20 @@ contract WaterfallModule is Clone {
         address nonWaterfallToken, address recipient, uint256 amount
     );
 
+    /// Emitted after funds withdrawn using pull flow
+    /// @param account Account withdrawing funds for
+    /// @param amount Amount withdrawn
+    event Withdrawal(address account, uint256 amount);
+
     /// -----------------------------------------------------------------------
     /// storage
     /// -----------------------------------------------------------------------
 
     address internal constant ETH_ADDRESS = address(0);
+
+    uint256 internal constant PUSH = 0;
+    uint256 internal constant PULL = 1;
+
     uint256 internal constant ONE_WORD = 32;
     uint256 internal constant THRESHOLD_BITS = 96;
     uint256 internal constant ADDRESS_BITS = 160;
@@ -82,7 +94,13 @@ contract WaterfallModule is Clone {
     }
 
     /// Amount of distributed waterfall token
-    uint256 public distributedFunds;
+    uint128 public distributedFunds;
+
+    /// Amount of active balance set aside for pulls
+    uint128 public fundsPendingWithdrawal;
+
+    /// @notice mapping to account balances for pulling
+    mapping(address => uint256) internal pullBalances;
 
     /// -----------------------------------------------------------------------
     /// constructor
@@ -108,6 +126,142 @@ contract WaterfallModule is Clone {
 
     /// Waterfalls target token inside the contract to next-in-line recipients
     function waterfallFunds() external payable {
+        _waterfallFunds(PUSH);
+    }
+
+    function waterfallFundsPull() external payable {
+        _waterfallFunds(PULL);
+    }
+
+    /// Recover non-waterfall'd tokens to a recipient
+    /// @param nonWaterfallToken Token to recover (cannot be waterfall token)
+    /// @param recipient Address to receive recovered token
+    function recoverNonWaterfallFunds(
+        address nonWaterfallToken,
+        address recipient
+    )
+        external
+        payable
+    {
+        /// checks
+
+        // revert if caller tries to recover waterfall token
+        if (nonWaterfallToken == token()) {
+            revert InvalidTokenRecovery_WaterfallToken();
+        }
+
+        // ensure txn recipient is a valid waterfall recipient
+        (address[] memory recipients,) = getTranches();
+        bool validRecipient = false;
+        uint256 _numTranches = numTranches();
+        for (uint256 i; i < _numTranches;) {
+            if (recipients[i] == recipient) {
+                validRecipient = true;
+                break;
+            }
+            unchecked {
+                // shouldn't overflow
+                ++i;
+            }
+        }
+        if (!validRecipient) {
+            revert InvalidTokenRecovery_InvalidRecipient();
+        }
+
+        /// effects
+
+        /// interactions
+
+        // recover non-target token
+        uint256 amount;
+        if (nonWaterfallToken == ETH_ADDRESS) {
+            amount = address(this).balance;
+            recipient.safeTransferETH(amount);
+        } else {
+            amount = ERC20(nonWaterfallToken).balanceOf(address(this));
+            ERC20(nonWaterfallToken).safeTransfer(recipient, amount);
+        }
+
+        emit RecoverNonWaterfallFunds(nonWaterfallToken, recipient, amount);
+    }
+
+    /**
+     * @notice Withdraw token balance for account `account`
+     * @param account Address to withdraw on behalf of
+     */
+    function withdraw(address account) external {
+        address _token = token();
+        uint256 tokenAmount = pullBalances[account];
+        unchecked {
+            // shouldn't underflow; invariant: fundsPendingWithdrawal = sum(pullBalances)
+            fundsPendingWithdrawal -= uint128( tokenAmount );
+        }
+        pullBalances[account] = 0;
+        if (_token == ETH_ADDRESS) {
+            account.safeTransferETH(tokenAmount);
+        } else {
+            ERC20(_token).safeTransfer(account, tokenAmount);
+        }
+
+        emit Withdrawal(account, tokenAmount);
+    }
+
+    /// -----------------------------------------------------------------------
+    /// functions - view & pure
+    /// -----------------------------------------------------------------------
+
+    /// Return tranches in an unpacked form
+    /// @return recipients Addresses to waterfall payments to
+    /// @return thresholds Absolute payment thresholds for waterfall recipients
+    function getTranches()
+        public
+        pure
+        returns (address[] memory recipients, uint256[] memory thresholds)
+    {
+        uint256 numRecipients = numTranches();
+        uint256 numThresholds;
+        unchecked {
+            // shouldn't underflow
+            numThresholds = numRecipients - 1;
+        }
+        recipients = new address[](numRecipients);
+        thresholds = new uint256[](numThresholds);
+
+        uint256 i = 0;
+        uint256 tranche;
+        for (; i < numThresholds;) {
+            tranche = _getTranche(i);
+            recipients[i] = address(uint160(tranche));
+            thresholds[i] = tranche >> ADDRESS_BITS;
+            unchecked {
+                ++i;
+            }
+        }
+        // recipients has one more entry than thresholds
+        recipients[i] = address(uint160(_getTranche(i)));
+    }
+
+    /**
+     * @notice Returns the balance for account `account`
+     * @param account Account to return balance for
+     * @return Account's balance waterfall token
+     */
+    function getPullBalance(address account) external view returns (uint256) {
+        return pullBalances[account];
+    }
+
+    function _getTranche(uint256 i) internal pure returns (uint256) {
+        unchecked {
+            // shouldn't overflow
+            return _getArgUint256(TRANCHES_OFFSET + i * ONE_WORD);
+        }
+    }
+
+    /// -----------------------------------------------------------------------
+    /// functions - private & internal
+    /// -----------------------------------------------------------------------
+
+    function _waterfallFunds(uint256 pullFlowFlag) internal {
         /// checks
 
         /// effects
@@ -115,11 +269,15 @@ contract WaterfallModule is Clone {
         // load storage into memory
 
         address _token = token();
-        uint256 _startingDistributedFunds = distributedFunds;
+        uint256 _startingDistributedFunds = uint256( distributedFunds );
         uint256 _endingDistributedFunds;
+        uint256 _memoryFundsPendingWithdrawal = uint256( fundsPendingWithdrawal );
         unchecked {
             // shouldn't overflow
             _endingDistributedFunds = _startingDistributedFunds
+                -
+                // fundsPendingWithdrawal is always <= _startingDistributedFunds
+                _memoryFundsPendingWithdrawal
                 +
                 // recognizes 0x0 as ETH
                 // shouldn't need to worry about re-entrancy from ERC20 view fn
@@ -168,7 +326,7 @@ contract WaterfallModule is Clone {
             uint256 _paidOut = _startingDistributedFunds;
             uint256 _index;
             uint256 _threshold;
-            uint256 i = 0;
+            uint256 i; // = 0
             uint256 loopLength;
             unchecked {
                 // shouldn't underflow since _payoutsLength >= 1
@@ -200,7 +358,7 @@ contract WaterfallModule is Clone {
                 _payouts[i] = _endingDistributedFunds - _paidOut;
             }
 
-            distributedFunds = _endingDistributedFunds;
+            distributedFunds = uint128( _endingDistributedFunds );
         }
 
         /// interactions
@@ -208,112 +366,26 @@ contract WaterfallModule is Clone {
         // pay outs
         // earlier external calls may try to re-enter but will cause fn to revert
         // when later external calls fail (bc balance is emptied early)
-        for (uint256 i = 0; i < _payoutsLength;) {
-            if (_token == ETH_ADDRESS) {
+        for (uint256 i; i < _payoutsLength;) {
+            if (pullFlowFlag == PULL) {
+                pullBalances[_payoutAddresses[i]] += _payouts[i];
+                _memoryFundsPendingWithdrawal += _payouts[i];
+            } else if (_token == ETH_ADDRESS) {
                 (_payoutAddresses[i]).safeTransferETH(_payouts[i]);
             } else {
                 ERC20(_token).safeTransfer(_payoutAddresses[i], _payouts[i]);
             }
+
             unchecked {
                 // shouldn't overflow
                 ++i;
             }
         }
 
-        emit WaterfallFunds(_payoutAddresses, _payouts);
-    }
-
-    /// Recover non-waterfall'd tokens to a recipient
-    /// @param nonWaterfallToken Token to recover (cannot be waterfall token)
-    /// @param recipient Address to receive recovered token
-    function recoverNonWaterfallFunds(
-        address nonWaterfallToken,
-        address recipient
-    )
-        external
-        payable
-    {
-        /// checks
-
-        // revert if caller tries to recover waterfall token
-        if (nonWaterfallToken == token()) {
-            revert InvalidTokenRecovery_WaterfallToken();
+        if (pullFlowFlag == PULL) {
+            fundsPendingWithdrawal = uint128( _memoryFundsPendingWithdrawal );
         }
 
-        // ensure txn recipient is a valid waterfall recipient
-        (address[] memory recipients,) = getTranches();
-        bool validRecipient = false;
-        uint256 _numTranches = numTranches();
-        for (uint256 i = 0; i < _numTranches;) {
-            if (recipients[i] == recipient) {
-                validRecipient = true;
-                break;
-            }
-            unchecked {
-                // shouldn't overflow
-                ++i;
-            }
-        }
-        if (!validRecipient) {
-            revert InvalidTokenRecovery_InvalidRecipient();
-        }
-
-        /// effects
-
-        /// interactions
-
-        // recover non-target token
-        uint256 amount;
-        if (nonWaterfallToken == ETH_ADDRESS) {
-            amount = address(this).balance;
-            recipient.safeTransferETH(amount);
-        } else {
-            amount = ERC20(nonWaterfallToken).balanceOf(address(this));
-            ERC20(nonWaterfallToken).safeTransfer(recipient, amount);
-        }
-
-        emit RecoverNonWaterfallFunds(nonWaterfallToken, recipient, amount);
-    }
-
-    /// -----------------------------------------------------------------------
-    /// functions - view & pure
-    /// -----------------------------------------------------------------------
-
-    /// Return tranches in an unpacked form
-    /// @return recipients Addresses to waterfall payments to
-    /// @return thresholds Absolute payment thresholds for waterfall recipients
-    function getTranches()
-        public
-        pure
-        returns (address[] memory recipients, uint256[] memory thresholds)
-    {
-        uint256 numRecipients = numTranches();
-        uint256 numThresholds;
-        unchecked {
-            // shouldn't underflow
-            numThresholds = numRecipients - 1;
-        }
-        recipients = new address[](numRecipients);
-        thresholds = new uint256[](numThresholds);
-
-        uint256 i = 0;
-        uint256 tranche;
-        for (; i < numThresholds;) {
-            tranche = _getTranche(i);
-            recipients[i] = address(uint160(tranche));
-            thresholds[i] = tranche >> ADDRESS_BITS;
-            unchecked {
-                ++i;
-            }
-        }
-        // recipients has one more entry than thresholds
-        recipients[i] = address(uint160(_getTranche(i)));
-    }
-
-    function _getTranche(uint256 i) internal pure returns (uint256) {
-        unchecked {
-            // shouldn't overflow
-            return _getArgUint256(TRANCHES_OFFSET + i * ONE_WORD);
-        }
+        emit WaterfallFunds(_payoutAddresses, _payouts, pullFlowFlag);
     }
 }
