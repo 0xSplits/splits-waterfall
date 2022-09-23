@@ -1,5 +1,7 @@
 # splits-waterfall
 
+[Docs](https://docs.0xsplits.xyz/modules/waterfall)
+
 Install [foundry](https://github.com/foundry-rs/foundry#installation), then run `forge install` and `forge build` to compile the contracts.
 
 ## lint
