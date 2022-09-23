@@ -24,7 +24,7 @@ contract WaterfallModuleTest is Test {
     event ReceiveETH(uint256 amount);
 
     event WaterfallFunds(
-        address[] recipients, uint256[] payouts, uint256 shouldUsePullFlow
+        address[] recipients, uint256[] payouts, uint256 pullFlowFlag
     );
 
     event RecoverNonWaterfallFunds(
@@ -877,7 +877,7 @@ contract WaterfallModuleTest is Test {
         uint256 _thresholdsSeed,
         uint8 _numDeposits,
         uint48 _ethAmount,
-        uint128 _erc20Amount
+        uint96 _erc20Amount
     )
         public
     {
@@ -894,11 +894,17 @@ contract WaterfallModuleTest is Test {
             address(mERC20), _trancheRecipients, _trancheThresholds
         );
 
+        /// test eth
+
         for (uint256 i = 0; i < _numDeposits; i++) {
             address(wmETH).safeTransferETH(_ethAmount);
             wmETH.waterfallFunds();
         }
         uint256 _totalETHAmount = uint256(_numDeposits) * uint256(_ethAmount);
+
+        assertEq(address( wmETH ).balance, 0 ether);
+        assertEq(wmETH.distributedFunds(), _totalETHAmount);
+        assertEq(wmETH.fundsPendingWithdrawal(), 0 ether);
         assertEq(
             _trancheRecipients[0].balance,
             (_totalETHAmount >= _trancheThresholds[0])
@@ -927,12 +933,191 @@ contract WaterfallModuleTest is Test {
                 : 0
         );
 
+        /// test erc20
+
         for (uint256 i = 0; i < _numDeposits; i++) {
             ERC20(mERC20).safeTransfer(address(wmERC20), _erc20Amount);
             wmERC20.waterfallFunds();
         }
         uint256 _totalERC20Amount =
             uint256(_numDeposits) * uint256(_erc20Amount);
+
+        assertEq(ERC20(mERC20).balanceOf(address( wmERC20 )), 0 ether);
+        assertEq(wmERC20.distributedFunds(), _totalERC20Amount);
+        assertEq(wmERC20.fundsPendingWithdrawal(), 0 ether);
+        assertEq(
+            ERC20(mERC20).balanceOf(_trancheRecipients[0]),
+            (_totalERC20Amount >= _trancheThresholds[0])
+                ? _trancheThresholds[0]
+                : _totalERC20Amount
+        );
+        for (uint256 i = 1; i < _trancheThresholds.length; i++) {
+            if (_totalERC20Amount >= _trancheThresholds[i]) {
+                assertEq(
+                    ERC20(mERC20).balanceOf(_trancheRecipients[i]),
+                    _trancheThresholds[i] - _trancheThresholds[i - 1]
+                );
+            } else if (_totalERC20Amount > _trancheThresholds[i - 1]) {
+                assertEq(
+                    ERC20(mERC20).balanceOf(_trancheRecipients[i]),
+                    _totalERC20Amount - _trancheThresholds[i - 1]
+                );
+            } else {
+                assertEq(ERC20(mERC20).balanceOf(_trancheRecipients[i]), 0);
+            }
+        }
+        assertEq(
+            ERC20(mERC20).balanceOf(_trancheRecipients[_trancheRecipients.length - 1]),
+            (_totalERC20Amount > _trancheThresholds[_trancheRecipients.length - 2])
+                ? _totalERC20Amount - _trancheThresholds[_trancheRecipients.length - 2]
+                : 0
+        );
+    }
+
+    function testCan_waterfallPullDepositsToRecipients(
+        uint8 _numTranches,
+        uint256 _recipientsSeed,
+        uint256 _thresholdsSeed,
+        uint8 _numDeposits,
+        uint48 _ethAmount,
+        uint96 _erc20Amount
+    )
+        public
+    {
+        uint256 numTranches = bound(_numTranches, 2, type(uint8).max);
+
+        (
+            address[] memory _trancheRecipients, uint256[] memory _trancheThresholds
+        ) = generateTranches(numTranches, _recipientsSeed, _thresholdsSeed);
+
+        wmETH = wmf.createWaterfallModule(
+            ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+        );
+        wmERC20 = wmf.createWaterfallModule(
+            address(mERC20), _trancheRecipients, _trancheThresholds
+        );
+
+        /// test eth
+
+        for (uint256 i = 0; i < _numDeposits; i++) {
+            address(wmETH).safeTransferETH(_ethAmount);
+            wmETH.waterfallFundsPull();
+        }
+        uint256 _totalETHAmount = uint256(_numDeposits) * uint256(_ethAmount);
+
+        assertEq(address( wmETH ).balance, _totalETHAmount);
+        assertEq(wmETH.distributedFunds(), _totalETHAmount);
+        assertEq(wmETH.fundsPendingWithdrawal(), _totalETHAmount);
+        assertEq(
+                 wmETH.getPullBalance(_trancheRecipients[0]),
+            (_totalETHAmount >= _trancheThresholds[0])
+                ? _trancheThresholds[0]
+                : _totalETHAmount
+        );
+        for (uint256 i = 1; i < _trancheThresholds.length; i++) {
+            if (_totalETHAmount >= _trancheThresholds[i]) {
+                assertEq(
+                    wmETH.getPullBalance(_trancheRecipients[i]),
+                    _trancheThresholds[i] - _trancheThresholds[i - 1]
+                );
+            } else if (_totalETHAmount > _trancheThresholds[i - 1]) {
+                assertEq(
+                    wmETH.getPullBalance(_trancheRecipients[i]),
+                    _totalETHAmount - _trancheThresholds[i - 1]
+                );
+            } else {
+                assertEq(wmETH.getPullBalance(_trancheRecipients[i]), 0);
+            }
+        }
+        assertEq(
+            wmETH.getPullBalance(_trancheRecipients[_trancheRecipients.length - 1]),
+            (_totalETHAmount > _trancheThresholds[_trancheRecipients.length - 2])
+                ? _totalETHAmount - _trancheThresholds[_trancheRecipients.length - 2]
+                : 0
+        );
+
+        for (uint256 i = 0; i < _trancheRecipients.length; i++) {
+            wmETH.withdraw(_trancheRecipients[i]);
+        }
+
+        assertEq(address( wmETH ).balance, 0);
+        assertEq(wmETH.distributedFunds(), _totalETHAmount);
+        assertEq(wmETH.fundsPendingWithdrawal(), 0);
+        assertEq(
+                 _trancheRecipients[0].balance,
+                 (_totalETHAmount >= _trancheThresholds[0])
+                 ? _trancheThresholds[0]
+                 : _totalETHAmount
+                 );
+        for (uint256 i = 1; i < _trancheThresholds.length; i++) {
+            if (_totalETHAmount >= _trancheThresholds[i]) {
+                assertEq(
+                    _trancheRecipients[i].balance,
+                    _trancheThresholds[i] - _trancheThresholds[i - 1]
+                );
+            } else if (_totalETHAmount > _trancheThresholds[i - 1]) {
+                assertEq(
+                    _trancheRecipients[i].balance,
+                    _totalETHAmount - _trancheThresholds[i - 1]
+                );
+            } else {
+                assertEq(_trancheRecipients[i].balance, 0);
+            }
+        }
+        assertEq(
+            _trancheRecipients[_trancheRecipients.length - 1].balance,
+            (_totalETHAmount > _trancheThresholds[_trancheRecipients.length - 2])
+                ? _totalETHAmount - _trancheThresholds[_trancheRecipients.length - 2]
+                : 0
+        );
+
+        /// test erc20
+
+        for (uint256 i = 0; i < _numDeposits; i++) {
+            ERC20(mERC20).safeTransfer(address(wmERC20), _erc20Amount);
+            wmERC20.waterfallFundsPull();
+        }
+        uint256 _totalERC20Amount =
+            uint256(_numDeposits) * uint256(_erc20Amount);
+
+        assertEq(ERC20(mERC20).balanceOf(address( wmERC20 )), _totalERC20Amount);
+        assertEq(wmERC20.distributedFunds(), _totalERC20Amount);
+        assertEq(wmERC20.fundsPendingWithdrawal(), _totalERC20Amount);
+        assertEq(
+            wmERC20.getPullBalance(_trancheRecipients[0]),
+            (_totalERC20Amount >= _trancheThresholds[0])
+                ? _trancheThresholds[0]
+                : _totalERC20Amount
+        );
+        for (uint256 i = 1; i < _trancheThresholds.length; i++) {
+            if (_totalERC20Amount >= _trancheThresholds[i]) {
+                assertEq(
+                    wmERC20.getPullBalance(_trancheRecipients[i]),
+                    _trancheThresholds[i] - _trancheThresholds[i - 1]
+                );
+            } else if (_totalERC20Amount > _trancheThresholds[i - 1]) {
+                assertEq(
+                    wmERC20.getPullBalance(_trancheRecipients[i]),
+                    _totalERC20Amount - _trancheThresholds[i - 1]
+                );
+            } else {
+                assertEq(wmERC20.getPullBalance(_trancheRecipients[i]), 0);
+            }
+        }
+        assertEq(
+                 wmERC20.getPullBalance(_trancheRecipients[_trancheRecipients.length - 1]),
+            (_totalERC20Amount > _trancheThresholds[_trancheRecipients.length - 2])
+                ? _totalERC20Amount - _trancheThresholds[_trancheRecipients.length - 2]
+                : 0
+        );
+
+        for (uint256 i = 0; i < _trancheRecipients.length; i++) {
+            wmERC20.withdraw(_trancheRecipients[i]);
+        }
+
+        assertEq(ERC20(mERC20).balanceOf(address( wmERC20 )), 0);
+        assertEq(wmERC20.distributedFunds(), _totalERC20Amount);
+        assertEq(wmERC20.fundsPendingWithdrawal(), 0);
         assertEq(
             ERC20(mERC20).balanceOf(_trancheRecipients[0]),
             (_totalERC20Amount >= _trancheThresholds[0])
