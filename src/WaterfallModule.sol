@@ -10,7 +10,7 @@ import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 /// @notice A maximally-composable waterfall contract allowing multiple
 /// recipients to receive preferential payments before residual funds flow to a
 /// final address.
-/// @dev /// Only one token can be waterfall'd for a given deployment. There is a
+/// @dev Only one token can be waterfall'd for a given deployment. There is a
 /// recovery method for non-target tokens sent by accident.
 /// This contract uses token = address(0) to refer to ETH.
 contract WaterfallModule is Clone {
