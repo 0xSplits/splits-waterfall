@@ -192,7 +192,10 @@ contract WaterfallModule is Clone {
     function withdraw(address account) external {
         address _token = token();
         uint256 tokenAmount = pullBalances[account];
-        fundsPendingWithdrawal -= uint128( tokenAmount );
+        unchecked {
+            // shouldn't underflow; invariant: fundsPendingWithdrawal = sum(pullBalances)
+            fundsPendingWithdrawal -= uint128( tokenAmount );
+        }
         pullBalances[account] = 0;
         if (_token == ETH_ADDRESS) {
             account.safeTransferETH(tokenAmount);
