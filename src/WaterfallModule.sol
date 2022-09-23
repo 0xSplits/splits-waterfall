@@ -12,6 +12,7 @@ import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 /// final address.
 /// @dev Only one token can be waterfall'd for a given deployment. There is a
 /// recovery method for non-target tokens sent by accident.
+/// Target ERC20s with very large decimals may overflow & cause issues.
 /// This contract uses token = address(0) to refer to ETH.
 contract WaterfallModule is Clone {
     /// -----------------------------------------------------------------------
@@ -94,9 +95,11 @@ contract WaterfallModule is Clone {
     }
 
     /// Amount of distributed waterfall token
+    /// @dev ERC20s with very large decimals may overflow & cause issues
     uint128 public distributedFunds;
 
     /// Amount of active balance set aside for pulls
+    /// @dev ERC20s with very large decimals may overflow & cause issues
     uint128 public fundsPendingWithdrawal;
 
     /// @notice mapping to account balances for pulling
