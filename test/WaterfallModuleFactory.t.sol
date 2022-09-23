@@ -377,9 +377,31 @@ contract WaterfallModuleFactoryTest is Test {
             address[] memory _trancheRecipients, uint256[] memory _trancheThresholds
         ) = generateTranches(numTranches);
 
-        uint256 _temp = _trancheThresholds[swapIndex];
-        _trancheThresholds[swapIndex] = _trancheThresholds[swapIndex - 1];
-        _trancheThresholds[swapIndex - 1] = _temp;
+        ( _trancheThresholds[swapIndex], _trancheThresholds[swapIndex - 1] )  = (  _trancheThresholds[swapIndex - 1] , _trancheThresholds[swapIndex]) ;
+
+        vm.expectRevert(
+                        abi.encodeWithSelector(
+                                               WaterfallModuleFactory.InvalidWaterfall__ThresholdsOutOfOrder.selector,
+                                               swapIndex
+                                               )
+                        );
+        wmf.createWaterfallModule(
+                                  ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+                                  );
+
+        vm.expectRevert(
+                        abi.encodeWithSelector(
+                                               WaterfallModuleFactory.InvalidWaterfall__ThresholdsOutOfOrder.selector,
+                                               swapIndex
+                                               )
+                        );
+        wmf.createWaterfallModule(
+                                  address(mERC20), _trancheRecipients, _trancheThresholds
+                                  );
+
+        /// test equal thresholds
+
+        _trancheThresholds[swapIndex - 1]  = _trancheThresholds[swapIndex];
 
         vm.expectRevert(
             abi.encodeWithSelector(
