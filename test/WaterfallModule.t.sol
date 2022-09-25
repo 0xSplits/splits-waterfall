@@ -105,10 +105,10 @@ contract WaterfallModuleTest is Test {
     }
 
     function testCan_receiveETHViaTransfer() public {
-        payable( address(wmETH) ).transfer(1 ether);
+        payable(address(wmETH)).transfer(1 ether);
         assertEq(address(wmETH).balance, 1 ether);
 
-        payable( address(wmERC20) ).transfer(1 ether);
+        payable(address(wmERC20)).transfer(1 ether);
         assertEq(address(wmERC20).balance, 1 ether);
     }
 
@@ -863,8 +863,7 @@ contract WaterfallModuleTest is Test {
         );
         assertEq(mERC20.balanceOf(address(wmETH)), 0);
         assertEq(
-            mERC20.balanceOf(_trancheRecipients[recoveryIndex]),
-            _erc20Amount
+            mERC20.balanceOf(_trancheRecipients[recoveryIndex]), _erc20Amount
         );
 
         address(wmERC20).safeTransferETH(_ethAmount);
@@ -975,9 +974,7 @@ contract WaterfallModuleTest is Test {
             }
         }
         assertEq(
-            mERC20.balanceOf(
-                _trancheRecipients[_trancheRecipients.length - 1]
-            ),
+            mERC20.balanceOf(_trancheRecipients[_trancheRecipients.length - 1]),
             (
                 _totalERC20Amount
                     > _trancheThresholds[_trancheRecipients.length - 2]
@@ -1169,9 +1166,7 @@ contract WaterfallModuleTest is Test {
             }
         }
         assertEq(
-            mERC20.balanceOf(
-                _trancheRecipients[_trancheRecipients.length - 1]
-            ),
+            mERC20.balanceOf(_trancheRecipients[_trancheRecipients.length - 1]),
             (
                 _totalERC20Amount
                     > _trancheThresholds[_trancheRecipients.length - 2]

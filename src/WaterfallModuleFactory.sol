@@ -2,8 +2,7 @@
 pragma solidity 0.8.17;
 
 import {WaterfallModule} from "./WaterfallModule.sol";
-import {LibClone} from
-    "solady/utils/LibClone.sol";
+import {LibClone} from "solady/utils/LibClone.sol";
 
 /// @title WaterfallModuleFactory
 /// @author 0xSplits
