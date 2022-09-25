@@ -104,6 +104,14 @@ contract WaterfallModuleTest is Test {
         assertEq(address(wmERC20).balance, 1 ether);
     }
 
+    function testCan_receiveETHViaTransfer() public {
+        payable( address(wmETH) ).transfer(1 ether);
+        assertEq(address(wmETH).balance, 1 ether);
+
+        payable( address(wmERC20) ).transfer(1 ether);
+        assertEq(address(wmERC20).balance, 1 ether);
+    }
+
     function testCan_emitOnReceiveETH() public {
         vm.expectEmit(true, true, true, true);
         emit ReceiveETH(1 ether);
