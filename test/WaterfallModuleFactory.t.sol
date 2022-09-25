@@ -3,7 +3,6 @@ pragma solidity 0.8.15;
 
 import {Test} from "forge-std/Test.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
-import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 
 import {WaterfallModuleFactory} from "../src/WaterfallModuleFactory.sol";
 import {WaterfallModule} from "../src/WaterfallModule.sol";

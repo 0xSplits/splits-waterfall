@@ -2,8 +2,8 @@
 pragma solidity 0.8.15;
 
 import {WaterfallModule} from "./WaterfallModule.sol";
-import {ClonesWithImmutableArgs} from
-    "clones-with-immutable-args/ClonesWithImmutableArgs.sol";
+import {LibClone} from
+    "solady/utils/LibClone.sol";
 
 /// @title WaterfallModuleFactory
 /// @author 0xSplits
@@ -39,7 +39,7 @@ contract WaterfallModuleFactory {
     /// libraries
     /// -----------------------------------------------------------------------
 
-    using ClonesWithImmutableArgs for address;
+    using LibClone for address;
 
     /// -----------------------------------------------------------------------
     /// events

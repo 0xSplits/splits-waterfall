@@ -9,6 +9,7 @@ remappings = [
     'forge-std/=lib/forge-std/src/',
     'clones-with-immutable-args/=lib/clones-with-immutable-args/src/',
     'solmate/=lib/solmate/src/',
+    'solady/=lib/solady/src/',
 ]
 libraries = []
 cache = true

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.15;
 
-import {Clone} from "clones-with-immutable-args/Clone.sol";
+import {Clone} from "solady/utils/Clone.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
-import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
+import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 
 /// @title WaterfallModule
 /// @author 0xSplits
@@ -20,7 +20,6 @@ contract WaterfallModule is Clone {
     /// -----------------------------------------------------------------------
 
     using SafeTransferLib for address;
-    using SafeTransferLib for ERC20;
 
     /// -----------------------------------------------------------------------
     /// errors
@@ -179,7 +178,7 @@ contract WaterfallModule is Clone {
             recipient.safeTransferETH(amount);
         } else {
             amount = ERC20(nonWaterfallToken).balanceOf(address(this));
-            ERC20(nonWaterfallToken).safeTransfer(recipient, amount);
+            nonWaterfallToken.safeTransfer(recipient, amount);
         }
 
         emit RecoverNonWaterfallFunds(nonWaterfallToken, recipient, amount);
@@ -200,7 +199,7 @@ contract WaterfallModule is Clone {
         if (_token == ETH_ADDRESS) {
             account.safeTransferETH(tokenAmount);
         } else {
-            ERC20(_token).safeTransfer(account, tokenAmount);
+            _token.safeTransfer(account, tokenAmount);
         }
 
         emit Withdrawal(account, tokenAmount);
@@ -371,7 +370,7 @@ contract WaterfallModule is Clone {
             } else if (_token == ETH_ADDRESS) {
                 (_payoutAddresses[i]).safeTransferETH(_payouts[i]);
             } else {
-                ERC20(_token).safeTransfer(_payoutAddresses[i], _payouts[i]);
+                _token.safeTransfer(_payoutAddresses[i], _payouts[i]);
             }
 
             unchecked {

@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import {Test} from "forge-std/Test.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
-import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
+import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 
 import {WaterfallModuleFactory} from "../src/WaterfallModuleFactory.sol";
 import {WaterfallModule} from "../src/WaterfallModule.sol";
@@ -12,7 +12,6 @@ import {MockERC20} from "./mocks/MockERC20.sol";
 
 contract WaterfallModuleTest is Test {
     using SafeTransferLib for address;
-    using SafeTransferLib for ERC20;
 
     event CreateWaterfallModule(
         address indexed waterfallModule,
@@ -113,54 +112,54 @@ contract WaterfallModuleTest is Test {
     }
 
     function testCan_receiveERC20() public {
-        ERC20(mERC20).safeTransfer(address(wmETH), 1 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(wmETH)), 1 ether);
+        address(mERC20).safeTransfer(address(wmETH), 1 ether);
+        assertEq(mERC20.balanceOf(address(wmETH)), 1 ether);
 
-        ERC20(mERC20).safeTransfer(address(wmERC20), 1 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 1 ether);
+        address(mERC20).safeTransfer(address(wmERC20), 1 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 1 ether);
     }
 
     function testCan_recoverNonWaterfallFundsToRecipient() public {
         address(wmETH).safeTransferETH(1 ether);
-        ERC20(mERC20).safeTransfer(address(wmETH), 1 ether);
+        address(mERC20).safeTransfer(address(wmETH), 1 ether);
 
         wmETH.recoverNonWaterfallFunds(address(mERC20), address(0));
         assertEq(address(wmETH).balance, 1 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(wmETH)), 0 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(0)), 1 ether);
+        assertEq(mERC20.balanceOf(address(wmETH)), 0 ether);
+        assertEq(mERC20.balanceOf(address(0)), 1 ether);
 
-        ERC20(mERC20).safeTransfer(address(wmETH), 1 ether);
+        address(mERC20).safeTransfer(address(wmETH), 1 ether);
 
         wmETH.recoverNonWaterfallFunds(address(mERC20), address(1));
         assertEq(address(wmETH).balance, 1 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(wmETH)), 0 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(1)), 1 ether);
+        assertEq(mERC20.balanceOf(address(wmETH)), 0 ether);
+        assertEq(mERC20.balanceOf(address(1)), 1 ether);
 
-        ERC20(mERC20).safeTransfer(address(wmERC20), 1 ether);
+        address(mERC20).safeTransfer(address(wmERC20), 1 ether);
         address(wmERC20).safeTransferETH(1 ether);
 
         wmERC20.recoverNonWaterfallFunds(ETH_ADDRESS, address(0));
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 1 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 1 ether);
         assertEq(address(wmERC20).balance, 0 ether);
         assertEq(address(0).balance, 1 ether);
 
         address(wmERC20).safeTransferETH(1 ether);
 
         wmERC20.recoverNonWaterfallFunds(ETH_ADDRESS, address(1));
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 1 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 1 ether);
         assertEq(address(wmERC20).balance, 0 ether);
         assertEq(address(1).balance, 1 ether);
     }
 
     function testCan_emitOnRecoverNonWaterfallFundsToRecipient() public {
         address(wmETH).safeTransferETH(1 ether);
-        ERC20(mERC20).safeTransfer(address(wmETH), 1 ether);
+        address(mERC20).safeTransfer(address(wmETH), 1 ether);
 
         vm.expectEmit(true, true, true, true);
         emit RecoverNonWaterfallFunds(address(mERC20), address(1), 1 ether);
         wmETH.recoverNonWaterfallFunds(address(mERC20), address(1));
 
-        ERC20(mERC20).safeTransfer(address(wmERC20), 1 ether);
+        address(mERC20).safeTransfer(address(wmERC20), 1 ether);
         address(wmERC20).safeTransferETH(1 ether);
 
         vm.expectEmit(true, true, true, true);
@@ -170,14 +169,14 @@ contract WaterfallModuleTest is Test {
 
     function testCannot_recoverNonWaterfallFundsToNonRecipient() public {
         address(wmETH).safeTransferETH(1 ether);
-        ERC20(mERC20).safeTransfer(address(wmETH), 1 ether);
+        address(mERC20).safeTransfer(address(wmETH), 1 ether);
 
         vm.expectRevert(
             WaterfallModule.InvalidTokenRecovery_InvalidRecipient.selector
         );
         wmETH.recoverNonWaterfallFunds(address(mERC20), address(2));
 
-        ERC20(mERC20).safeTransfer(address(wmERC20), 1 ether);
+        address(mERC20).safeTransfer(address(wmERC20), 1 ether);
         address(wmERC20).safeTransferETH(1 ether);
 
         vm.expectRevert(
@@ -188,14 +187,14 @@ contract WaterfallModuleTest is Test {
 
     function testCannot_recoverWaterfallFunds() public {
         address(wmETH).safeTransferETH(1 ether);
-        ERC20(mERC20).safeTransfer(address(wmETH), 1 ether);
+        address(mERC20).safeTransfer(address(wmETH), 1 ether);
 
         vm.expectRevert(
             WaterfallModule.InvalidTokenRecovery_WaterfallToken.selector
         );
         wmETH.recoverNonWaterfallFunds(ETH_ADDRESS, address(0));
 
-        ERC20(mERC20).safeTransfer(address(wmERC20), 1 ether);
+        address(mERC20).safeTransfer(address(wmERC20), 1 ether);
         address(wmERC20).safeTransferETH(1 ether);
 
         vm.expectRevert(
@@ -217,7 +216,7 @@ contract WaterfallModuleTest is Test {
         assertEq(address(0).balance, 0 ether);
 
         wmERC20.waterfallFunds();
-        assertEq(ERC20(mERC20).balanceOf(address(0)), 0 ether);
+        assertEq(mERC20.balanceOf(address(0)), 0 ether);
     }
 
     function testCan_emitOnWaterfallToNoRecipients() public {
@@ -242,16 +241,16 @@ contract WaterfallModuleTest is Test {
         assertEq(address(0).balance, 1 ether);
         assertEq(address(1).balance, 0 ether);
 
-        ERC20(mERC20).safeTransfer(address(wmERC20), 1 ether);
+        address(mERC20).safeTransfer(address(wmERC20), 1 ether);
 
         wmERC20.waterfallFunds();
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 0 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(0)), 1 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 0 ether);
+        assertEq(mERC20.balanceOf(address(0)), 1 ether);
 
         wmERC20.waterfallFunds();
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 0 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(0)), 1 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(1)), 0 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 0 ether);
+        assertEq(mERC20.balanceOf(address(0)), 1 ether);
+        assertEq(mERC20.balanceOf(address(1)), 0 ether);
     }
 
     function testCan_emitOnWaterfallToFirstRecipient() public {
@@ -265,7 +264,7 @@ contract WaterfallModuleTest is Test {
         emit WaterfallFunds(recipients, payouts, 0);
         wmETH.waterfallFunds();
 
-        ERC20(mERC20).safeTransfer(address(wmERC20), 1 ether);
+        address(mERC20).safeTransfer(address(wmERC20), 1 ether);
 
         vm.expectEmit(true, true, true, true);
         emit WaterfallFunds(recipients, payouts, 0);
@@ -283,15 +282,15 @@ contract WaterfallModuleTest is Test {
         assertEq(address(wmETH).balance, 0 ether);
         assertEq(address(0).balance, 1 ether);
 
-        ERC20(mERC20).safeTransfer(address(wmERC20), 0.5 ether);
+        address(mERC20).safeTransfer(address(wmERC20), 0.5 ether);
         wmERC20.waterfallFunds();
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 0 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(0)), 0.5 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 0 ether);
+        assertEq(mERC20.balanceOf(address(0)), 0.5 ether);
 
-        ERC20(mERC20).safeTransfer(address(wmERC20), 0.5 ether);
+        address(mERC20).safeTransfer(address(wmERC20), 0.5 ether);
         wmERC20.waterfallFunds();
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 0 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(0)), 1 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 0 ether);
+        assertEq(mERC20.balanceOf(address(0)), 1 ether);
     }
 
     function testCan_waterfallToBothRecipients() public {
@@ -301,11 +300,11 @@ contract WaterfallModuleTest is Test {
         assertEq(address(0).balance, 1 ether);
         assertEq(address(1).balance, 1 ether);
 
-        ERC20(mERC20).safeTransfer(address(wmERC20), 2 ether);
+        address(mERC20).safeTransfer(address(wmERC20), 2 ether);
         wmERC20.waterfallFunds();
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 0 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(0)), 1 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(1)), 1 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 0 ether);
+        assertEq(mERC20.balanceOf(address(0)), 1 ether);
+        assertEq(mERC20.balanceOf(address(1)), 1 ether);
     }
 
     function testCan_emitOnWaterfallToBothRecipients() public {
@@ -321,7 +320,7 @@ contract WaterfallModuleTest is Test {
         emit WaterfallFunds(recipients, payouts, 0);
         wmETH.waterfallFunds();
 
-        ERC20(mERC20).safeTransfer(address(wmERC20), 2 ether);
+        address(mERC20).safeTransfer(address(wmERC20), 2 ether);
         vm.expectEmit(true, true, true, true);
         emit WaterfallFunds(recipients, payouts, 0);
         wmERC20.waterfallFunds();
@@ -338,15 +337,15 @@ contract WaterfallModuleTest is Test {
         assertEq(address(0).balance, 1 ether);
         assertEq(address(1).balance, 1 ether);
 
-        ERC20(mERC20).safeTransfer(address(wmERC20), 1 ether);
+        address(mERC20).safeTransfer(address(wmERC20), 1 ether);
         wmERC20.waterfallFunds();
 
-        ERC20(mERC20).safeTransfer(address(wmERC20), 1 ether);
+        address(mERC20).safeTransfer(address(wmERC20), 1 ether);
         wmERC20.waterfallFunds();
 
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 0 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(0)), 1 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(1)), 1 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 0 ether);
+        assertEq(mERC20.balanceOf(address(0)), 1 ether);
+        assertEq(mERC20.balanceOf(address(1)), 1 ether);
     }
 
     function testCan_waterfallToResidualRecipient() public {
@@ -359,14 +358,14 @@ contract WaterfallModuleTest is Test {
         assertEq(address(0).balance, 1 ether);
         assertEq(address(1).balance, 19 ether);
 
-        ERC20(mERC20).safeTransfer(address(wmERC20), 10 ether);
+        address(mERC20).safeTransfer(address(wmERC20), 10 ether);
         wmERC20.waterfallFunds();
-        ERC20(mERC20).safeTransfer(address(wmERC20), 10 ether);
+        address(mERC20).safeTransfer(address(wmERC20), 10 ether);
         wmERC20.waterfallFunds();
 
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 0 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(0)), 1 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(1)), 19 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 0 ether);
+        assertEq(mERC20.balanceOf(address(0)), 1 ether);
+        assertEq(mERC20.balanceOf(address(1)), 19 ether);
     }
 
     function testCannot_reenterWaterfall() public {
@@ -386,7 +385,7 @@ contract WaterfallModuleTest is Test {
             ETH_ADDRESS, _trancheRecipients, _trancheThresholds
         );
         address(wmETH).safeTransferETH(10 ether);
-        vm.expectRevert(bytes("ETH_TRANSFER_FAILED"));
+        vm.expectRevert(SafeTransferLib.ETHTransferFailed.selector);
         wmETH.waterfallFunds();
         assertEq(address(wmETH).balance, 10 ether);
         assertEq(address(wr).balance, 0 ether);
@@ -433,12 +432,12 @@ contract WaterfallModuleTest is Test {
         assertEq(wmETH.fundsPendingWithdrawal(), 0 ether);
 
         // test erc20
-        ERC20(mERC20).safeTransfer(address(wmERC20), 10 ether);
+        address(mERC20).safeTransfer(address(wmERC20), 10 ether);
         wmERC20.waterfallFundsPull();
 
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 10 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(0)), 0 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(1)), 0 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 10 ether);
+        assertEq(mERC20.balanceOf(address(0)), 0 ether);
+        assertEq(mERC20.balanceOf(address(1)), 0 ether);
 
         assertEq(wmERC20.getPullBalance(address(0)), 1 ether);
         assertEq(wmERC20.getPullBalance(address(1)), 9 ether);
@@ -448,9 +447,9 @@ contract WaterfallModuleTest is Test {
 
         wmERC20.withdraw(address(0));
 
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 9 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(0)), 1 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(1)), 0 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 9 ether);
+        assertEq(mERC20.balanceOf(address(0)), 1 ether);
+        assertEq(mERC20.balanceOf(address(1)), 0 ether);
 
         assertEq(wmERC20.getPullBalance(address(0)), 0 ether);
         assertEq(wmERC20.getPullBalance(address(1)), 9 ether);
@@ -460,9 +459,9 @@ contract WaterfallModuleTest is Test {
 
         wmERC20.withdraw(address(1));
 
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 0 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(0)), 1 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(1)), 9 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 0 ether);
+        assertEq(mERC20.balanceOf(address(0)), 1 ether);
+        assertEq(mERC20.balanceOf(address(1)), 9 ether);
 
         assertEq(wmERC20.getPullBalance(address(0)), 0 ether);
         assertEq(wmERC20.getPullBalance(address(1)), 0 ether);
@@ -567,14 +566,14 @@ contract WaterfallModuleTest is Test {
         assertEq(wmETH.fundsPendingWithdrawal(), 0 ether);
 
         // test erc20
-        ERC20(mERC20).safeTransfer(address(wmERC20), 0.5 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 0.5 ether);
+        address(mERC20).safeTransfer(address(wmERC20), 0.5 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 0.5 ether);
 
         wmERC20.waterfallFunds();
 
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 0 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(0)), 0.5 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(1)), 0 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 0 ether);
+        assertEq(mERC20.balanceOf(address(0)), 0.5 ether);
+        assertEq(mERC20.balanceOf(address(1)), 0 ether);
 
         assertEq(wmERC20.getPullBalance(address(0)), 0 ether);
         assertEq(wmERC20.getPullBalance(address(1)), 0 ether);
@@ -582,14 +581,14 @@ contract WaterfallModuleTest is Test {
         assertEq(wmERC20.distributedFunds(), 0.5 ether);
         assertEq(wmERC20.fundsPendingWithdrawal(), 0 ether);
 
-        ERC20(mERC20).safeTransfer(address(wmERC20), 1 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 1 ether);
+        address(mERC20).safeTransfer(address(wmERC20), 1 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 1 ether);
 
         wmERC20.waterfallFundsPull();
 
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 1 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(0)), 0.5 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(1)), 0 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 1 ether);
+        assertEq(mERC20.balanceOf(address(0)), 0.5 ether);
+        assertEq(mERC20.balanceOf(address(1)), 0 ether);
 
         assertEq(wmERC20.getPullBalance(address(0)), 0.5 ether);
         assertEq(wmERC20.getPullBalance(address(1)), 0.5 ether);
@@ -599,9 +598,9 @@ contract WaterfallModuleTest is Test {
 
         wmERC20.waterfallFundsPull();
 
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 1 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(0)), 0.5 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(1)), 0 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 1 ether);
+        assertEq(mERC20.balanceOf(address(0)), 0.5 ether);
+        assertEq(mERC20.balanceOf(address(1)), 0 ether);
 
         assertEq(wmERC20.getPullBalance(address(0)), 0.5 ether);
         assertEq(wmERC20.getPullBalance(address(1)), 0.5 ether);
@@ -609,14 +608,14 @@ contract WaterfallModuleTest is Test {
         assertEq(wmERC20.distributedFunds(), 1.5 ether);
         assertEq(wmERC20.fundsPendingWithdrawal(), 1 ether);
 
-        ERC20(mERC20).safeTransfer(address(wmERC20), 1 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 2 ether);
+        address(mERC20).safeTransfer(address(wmERC20), 1 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 2 ether);
 
         wmERC20.waterfallFunds();
 
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 1 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(0)), 0.5 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(1)), 1 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 1 ether);
+        assertEq(mERC20.balanceOf(address(0)), 0.5 ether);
+        assertEq(mERC20.balanceOf(address(1)), 1 ether);
 
         assertEq(wmERC20.getPullBalance(address(0)), 0.5 ether);
         assertEq(wmERC20.getPullBalance(address(1)), 0.5 ether);
@@ -626,9 +625,9 @@ contract WaterfallModuleTest is Test {
 
         wmERC20.withdraw(address(0));
 
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 0.5 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(0)), 1 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(1)), 1 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 0.5 ether);
+        assertEq(mERC20.balanceOf(address(0)), 1 ether);
+        assertEq(mERC20.balanceOf(address(1)), 1 ether);
 
         assertEq(wmERC20.getPullBalance(address(0)), 0 ether);
         assertEq(wmERC20.getPullBalance(address(1)), 0.5 ether);
@@ -638,9 +637,9 @@ contract WaterfallModuleTest is Test {
 
         wmERC20.withdraw(address(1));
 
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 0 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(0)), 1 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(1)), 1.5 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 0 ether);
+        assertEq(mERC20.balanceOf(address(0)), 1 ether);
+        assertEq(mERC20.balanceOf(address(1)), 1.5 ether);
 
         assertEq(wmERC20.getPullBalance(address(0)), 0 ether);
         assertEq(wmERC20.getPullBalance(address(1)), 0 ether);
@@ -715,14 +714,14 @@ contract WaterfallModuleTest is Test {
         assertEq(wmETH.fundsPendingWithdrawal(), 0 ether);
 
         // test erc20
-        ERC20(mERC20).safeTransfer(address(wmERC20), 3 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 3 ether);
+        address(mERC20).safeTransfer(address(wmERC20), 3 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 3 ether);
 
         wmERC20.waterfallFundsPull();
 
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 3 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(0)), 0 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(1)), 0 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 3 ether);
+        assertEq(mERC20.balanceOf(address(0)), 0 ether);
+        assertEq(mERC20.balanceOf(address(1)), 0 ether);
 
         assertEq(wmERC20.getPullBalance(address(0)), 1 ether);
         assertEq(wmERC20.getPullBalance(address(1)), 2 ether);
@@ -732,9 +731,9 @@ contract WaterfallModuleTest is Test {
 
         wmERC20.withdraw(address(0));
 
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 2 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(0)), 1 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(1)), 0 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 2 ether);
+        assertEq(mERC20.balanceOf(address(0)), 1 ether);
+        assertEq(mERC20.balanceOf(address(1)), 0 ether);
 
         assertEq(wmERC20.getPullBalance(address(0)), 0 ether);
         assertEq(wmERC20.getPullBalance(address(1)), 2 ether);
@@ -744,9 +743,9 @@ contract WaterfallModuleTest is Test {
 
         wmERC20.withdraw(address(0));
 
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 2 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(0)), 1 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(1)), 0 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 2 ether);
+        assertEq(mERC20.balanceOf(address(0)), 1 ether);
+        assertEq(mERC20.balanceOf(address(1)), 0 ether);
 
         assertEq(wmERC20.getPullBalance(address(0)), 0 ether);
         assertEq(wmERC20.getPullBalance(address(1)), 2 ether);
@@ -756,9 +755,9 @@ contract WaterfallModuleTest is Test {
 
         wmERC20.withdraw(address(1));
 
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 0 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(0)), 1 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(1)), 2 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 0 ether);
+        assertEq(mERC20.balanceOf(address(0)), 1 ether);
+        assertEq(mERC20.balanceOf(address(1)), 2 ether);
 
         assertEq(wmERC20.getPullBalance(address(0)), 0 ether);
         assertEq(wmERC20.getPullBalance(address(1)), 0 ether);
@@ -768,9 +767,9 @@ contract WaterfallModuleTest is Test {
 
         wmERC20.withdraw(address(1));
 
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 0 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(0)), 1 ether);
-        assertEq(ERC20(mERC20).balanceOf(address(1)), 2 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 0 ether);
+        assertEq(mERC20.balanceOf(address(0)), 1 ether);
+        assertEq(mERC20.balanceOf(address(1)), 2 ether);
 
         assertEq(wmERC20.getPullBalance(address(0)), 0 ether);
         assertEq(wmERC20.getPullBalance(address(1)), 0 ether);
@@ -849,14 +848,14 @@ contract WaterfallModuleTest is Test {
             address(mERC20), _trancheRecipients, _trancheThresholds
         );
 
-        ERC20(mERC20).safeTransfer(address(wmETH), _erc20Amount);
+        address(mERC20).safeTransfer(address(wmETH), _erc20Amount);
 
         wmETH.recoverNonWaterfallFunds(
             address(mERC20), _trancheRecipients[recoveryIndex]
         );
-        assertEq(ERC20(mERC20).balanceOf(address(wmETH)), 0);
+        assertEq(mERC20.balanceOf(address(wmETH)), 0);
         assertEq(
-            ERC20(mERC20).balanceOf(_trancheRecipients[recoveryIndex]),
+            mERC20.balanceOf(_trancheRecipients[recoveryIndex]),
             _erc20Amount
         );
 
@@ -937,17 +936,17 @@ contract WaterfallModuleTest is Test {
         /// test erc20
 
         for (uint256 i = 0; i < _numDeposits; i++) {
-            ERC20(mERC20).safeTransfer(address(wmERC20), _erc20Amount);
+            address(mERC20).safeTransfer(address(wmERC20), _erc20Amount);
             wmERC20.waterfallFunds();
         }
         uint256 _totalERC20Amount =
             uint256(_numDeposits) * uint256(_erc20Amount);
 
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 0 ether);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 0 ether);
         assertEq(wmERC20.distributedFunds(), _totalERC20Amount);
         assertEq(wmERC20.fundsPendingWithdrawal(), 0 ether);
         assertEq(
-            ERC20(mERC20).balanceOf(_trancheRecipients[0]),
+            mERC20.balanceOf(_trancheRecipients[0]),
             (_totalERC20Amount >= _trancheThresholds[0])
                 ? _trancheThresholds[0]
                 : _totalERC20Amount
@@ -955,20 +954,20 @@ contract WaterfallModuleTest is Test {
         for (uint256 i = 1; i < _trancheThresholds.length; i++) {
             if (_totalERC20Amount >= _trancheThresholds[i]) {
                 assertEq(
-                    ERC20(mERC20).balanceOf(_trancheRecipients[i]),
+                    mERC20.balanceOf(_trancheRecipients[i]),
                     _trancheThresholds[i] - _trancheThresholds[i - 1]
                 );
             } else if (_totalERC20Amount > _trancheThresholds[i - 1]) {
                 assertEq(
-                    ERC20(mERC20).balanceOf(_trancheRecipients[i]),
+                    mERC20.balanceOf(_trancheRecipients[i]),
                     _totalERC20Amount - _trancheThresholds[i - 1]
                 );
             } else {
-                assertEq(ERC20(mERC20).balanceOf(_trancheRecipients[i]), 0);
+                assertEq(mERC20.balanceOf(_trancheRecipients[i]), 0);
             }
         }
         assertEq(
-            ERC20(mERC20).balanceOf(
+            mERC20.balanceOf(
                 _trancheRecipients[_trancheRecipients.length - 1]
             ),
             (
@@ -1090,13 +1089,13 @@ contract WaterfallModuleTest is Test {
         /// test erc20
 
         for (uint256 i = 0; i < _numDeposits; i++) {
-            ERC20(mERC20).safeTransfer(address(wmERC20), _erc20Amount);
+            address(mERC20).safeTransfer(address(wmERC20), _erc20Amount);
             wmERC20.waterfallFundsPull();
         }
         uint256 _totalERC20Amount =
             uint256(_numDeposits) * uint256(_erc20Amount);
 
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), _totalERC20Amount);
+        assertEq(mERC20.balanceOf(address(wmERC20)), _totalERC20Amount);
         assertEq(wmERC20.distributedFunds(), _totalERC20Amount);
         assertEq(wmERC20.fundsPendingWithdrawal(), _totalERC20Amount);
         assertEq(
@@ -1137,11 +1136,11 @@ contract WaterfallModuleTest is Test {
             wmERC20.withdraw(_trancheRecipients[i]);
         }
 
-        assertEq(ERC20(mERC20).balanceOf(address(wmERC20)), 0);
+        assertEq(mERC20.balanceOf(address(wmERC20)), 0);
         assertEq(wmERC20.distributedFunds(), _totalERC20Amount);
         assertEq(wmERC20.fundsPendingWithdrawal(), 0);
         assertEq(
-            ERC20(mERC20).balanceOf(_trancheRecipients[0]),
+            mERC20.balanceOf(_trancheRecipients[0]),
             (_totalERC20Amount >= _trancheThresholds[0])
                 ? _trancheThresholds[0]
                 : _totalERC20Amount
@@ -1149,20 +1148,20 @@ contract WaterfallModuleTest is Test {
         for (uint256 i = 1; i < _trancheThresholds.length; i++) {
             if (_totalERC20Amount >= _trancheThresholds[i]) {
                 assertEq(
-                    ERC20(mERC20).balanceOf(_trancheRecipients[i]),
+                    mERC20.balanceOf(_trancheRecipients[i]),
                     _trancheThresholds[i] - _trancheThresholds[i - 1]
                 );
             } else if (_totalERC20Amount > _trancheThresholds[i - 1]) {
                 assertEq(
-                    ERC20(mERC20).balanceOf(_trancheRecipients[i]),
+                    mERC20.balanceOf(_trancheRecipients[i]),
                     _totalERC20Amount - _trancheThresholds[i - 1]
                 );
             } else {
-                assertEq(ERC20(mERC20).balanceOf(_trancheRecipients[i]), 0);
+                assertEq(mERC20.balanceOf(_trancheRecipients[i]), 0);
             }
         }
         assertEq(
-            ERC20(mERC20).balanceOf(
+            mERC20.balanceOf(
                 _trancheRecipients[_trancheRecipients.length - 1]
             ),
             (
