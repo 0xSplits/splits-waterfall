@@ -272,7 +272,22 @@ contract WaterfallModuleTest is Test {
         emit WaterfallFunds(recipients, payouts, 0);
         wmETH.waterfallFunds();
 
+        address(wmETH).safeTransferETH(1 ether);
+        recipients[0] = address(1);
+
+        vm.expectEmit(true, true, true, true);
+        emit WaterfallFunds(recipients, payouts, 0);
+        wmETH.waterfallFunds();
+
         address(mERC20).safeTransfer(address(wmERC20), 1 ether);
+        recipients[0] = address(0);
+
+        vm.expectEmit(true, true, true, true);
+        emit WaterfallFunds(recipients, payouts, 0);
+        wmERC20.waterfallFunds();
+
+        address(mERC20).safeTransfer(address(wmERC20), 1 ether);
+        recipients[0] = address(1);
 
         vm.expectEmit(true, true, true, true);
         emit WaterfallFunds(recipients, payouts, 0);

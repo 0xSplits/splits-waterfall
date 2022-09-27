@@ -296,7 +296,7 @@ contract WaterfallModule is Clone {
             // index inc shouldn't overflow
             for (; _firstPayoutTranche < finalTranche; ++_firstPayoutTranche) {
                 if (
-                    thresholds[_firstPayoutTranche] >= _startingDistributedFunds
+                    thresholds[_firstPayoutTranche] > _startingDistributedFunds
                 ) {
                     break;
                 }
