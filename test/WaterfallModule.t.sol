@@ -391,6 +391,28 @@ contract WaterfallModuleTest is Test {
         assertEq(mERC20.balanceOf(address(1)), 19 ether);
     }
 
+    function testCannot_distributeTooMuch() public {
+        vm.deal(address(wmETH), type(uint128).max);
+        wmETH.waterfallFunds();
+        vm.deal(address(wmETH), 1);
+
+        vm.expectRevert(WaterfallModule.InvalidDistribution_TooLarge.selector);
+        wmETH.waterfallFunds();
+
+        vm.expectRevert(WaterfallModule.InvalidDistribution_TooLarge.selector);
+        wmETH.waterfallFundsPull();
+
+        address(mERC20).safeTransfer(address(wmERC20), type(uint128).max);
+        wmERC20.waterfallFunds();
+        address(mERC20).safeTransfer(address(wmERC20), 1);
+
+        vm.expectRevert(WaterfallModule.InvalidDistribution_TooLarge.selector);
+        wmERC20.waterfallFunds();
+
+        vm.expectRevert(WaterfallModule.InvalidDistribution_TooLarge.selector);
+        wmERC20.waterfallFundsPull();
+    }
+
     function testCannot_reenterWaterfall() public {
         WaterfallReentrancy wr = new WaterfallReentrancy();
 

@@ -31,6 +31,9 @@ contract WaterfallModule is Clone {
     /// Invalid token recovery recipient; not a waterfall recipient
     error InvalidTokenRecovery_InvalidRecipient();
 
+    /// Invalid distribution
+    error InvalidDistribution_TooLarge();
+
     /// -----------------------------------------------------------------------
     /// events
     /// -----------------------------------------------------------------------
@@ -299,9 +302,8 @@ contract WaterfallModule is Clone {
             // shouldn't overflow; finalTranche << 2^64
             // (contract would exceed byte limit well before then)
             for (; _firstPayoutTranche < finalTranche; ++_firstPayoutTranche) {
-                if (
-                    thresholds[_firstPayoutTranche] > _startingDistributedFunds
-                ) {
+                if (thresholds[_firstPayoutTranche] > _startingDistributedFunds)
+                {
                     break;
                 }
             }
@@ -363,6 +365,9 @@ contract WaterfallModule is Clone {
                 _payouts[i] = _endingDistributedFunds - _paidOut;
             }
 
+            if (_endingDistributedFunds > type(uint128).max) {
+                revert InvalidDistribution_TooLarge();
+            }
             distributedFunds = uint128(_endingDistributedFunds);
         }
 
