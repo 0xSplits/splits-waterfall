@@ -192,7 +192,7 @@ contract WaterfallModule is Clone {
         address _token = token();
         uint256 tokenAmount = pullBalances[account];
         unchecked {
-            // shouldn't underflow; invariant: fundsPendingWithdrawal = sum(pullBalances)
+            // shouldn't underflow; fundsPendingWithdrawal = sum(pullBalances)
             fundsPendingWithdrawal -= uint128(tokenAmount);
         }
         pullBalances[account] = 0;
@@ -288,12 +288,16 @@ contract WaterfallModule is Clone {
         (address[] memory recipients, uint256[] memory thresholds) =
             getTranches();
 
+        // determine the first and last payout tranches based on previously distributed
+        // funds & funds to be distributed
+
         uint256 _firstPayoutTranche;
         uint256 _lastPayoutTranche;
         unchecked {
-            // shouldn't underflow while numTranches() >= 2
+            // shouldn't underflow; numTranches() >= 2
             uint256 finalTranche = numTranches() - 1;
-            // index inc shouldn't overflow
+            // shouldn't overflow; finalTranche << 2^64
+            // (contract would exceed byte limit well before then)
             for (; _firstPayoutTranche < finalTranche; ++_firstPayoutTranche) {
                 if (
                     thresholds[_firstPayoutTranche] > _startingDistributedFunds
@@ -302,7 +306,8 @@ contract WaterfallModule is Clone {
                 }
             }
             _lastPayoutTranche = _firstPayoutTranche;
-            // index inc shouldn't overflow
+            // shouldn't overflow; finalTranche << 2^64
+            // (contract would exceed byte limit well before then)
             for (; _lastPayoutTranche < finalTranche; ++_lastPayoutTranche) {
                 if (thresholds[_lastPayoutTranche] >= _endingDistributedFunds) {
                     break;
@@ -310,9 +315,11 @@ contract WaterfallModule is Clone {
             }
         }
 
+        // construct the payout arrays
+
         uint256 _payoutsLength;
         unchecked {
-            // shouldn't underflow since _lastPayoutTranche >= _firstPayoutTranche
+            // shouldn't underflow; _lastPayoutTranche >= _firstPayoutTranche
             _payoutsLength = _lastPayoutTranche - _firstPayoutTranche + 1;
         }
         address[] memory _payoutAddresses = new address[](_payoutsLength);
@@ -326,7 +333,7 @@ contract WaterfallModule is Clone {
             uint256 i; // = 0
             uint256 loopLength;
             unchecked {
-                // shouldn't underflow since _payoutsLength >= 1
+                // shouldn't underflow; _payoutsLength >= 1
                 loopLength = _payoutsLength - 1;
             }
             for (; i < loopLength;) {
@@ -336,9 +343,10 @@ contract WaterfallModule is Clone {
 
                     _payoutAddresses[i] = recipients[_index];
                     _threshold = thresholds[_index];
-                    // shouldn't underflow since _paidOut begins < active
-                    // tranche's threshold and is then set to each preceding
-                    // threshold (which are monotonically increasing)
+                    // shouldn't underflow;
+                    // _paidOut = _startingDistributedFunds < thresholds[_firstPayoutTranche],
+                    // _paidOut = thresholds[i] < thresholds[i + 1],
+                    // thresholds are monotonically increasing
                     _payouts[i] = _threshold - _paidOut;
                     _paidOut = _threshold;
 
@@ -350,8 +358,8 @@ contract WaterfallModule is Clone {
             unchecked {
                 // shouldn't overflow
                 _payoutAddresses[i] = recipients[_firstPayoutTranche + i];
-                // shouldn't underflow since _paidOut = last tranche threshold,
-                // which should be <= _endingDistributedFunds by construction
+                // shouldn't underflow;
+                // _paidOut = threshold[_payoutsLength - 1] < _endingDistributedFunds
                 _payouts[i] = _endingDistributedFunds - _paidOut;
             }
 
@@ -361,7 +369,7 @@ contract WaterfallModule is Clone {
         /// interactions
 
         // pay outs
-        // earlier external calls may try to re-enter but will cause fn to revert
+        // earlier tranche recipients may try to re-enter but will cause fn to revert
         // when later external calls fail (bc balance is emptied early)
         for (uint256 i; i < _payoutsLength;) {
             if (pullFlowFlag == PULL) {
