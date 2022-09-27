@@ -112,13 +112,13 @@ contract WaterfallModuleFactory {
             revert InvalidWaterfall__ZeroThreshold();
         }
         // ensure first threshold isn't too large
-        if (uint96(thresholds[0]) != thresholds[0]) {
+        if (thresholds[0] > type(uint96).max) {
             revert InvalidWaterfall__ThresholdTooLarge(0);
         }
         // ensure packed thresholds increase monotonically
         uint256 i = 1;
         for (; i < thresholdsLength;) {
-            if (uint96(thresholds[i]) != thresholds[i]) {
+            if (thresholds[i] > type(uint96).max) {
                 revert InvalidWaterfall__ThresholdTooLarge(i);
             }
             unchecked {
