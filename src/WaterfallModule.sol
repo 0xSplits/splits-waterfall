@@ -104,7 +104,7 @@ contract WaterfallModule is Clone {
     /// @dev ERC20s with very large decimals may overflow & cause issues
     uint128 public fundsPendingWithdrawal;
 
-    /// @notice mapping to account balances for pulling
+    /// Mapping to account balances for pulling
     mapping(address => uint256) internal pullBalances;
 
     /// -----------------------------------------------------------------------
@@ -130,10 +130,14 @@ contract WaterfallModule is Clone {
     /* } */
 
     /// Waterfalls target token inside the contract to next-in-line recipients
+    /// @dev pushes funds to recipients
     function waterfallFunds() external payable {
         _waterfallFunds(PUSH);
     }
 
+    /// Waterfalls target token inside the contract to next-in-line recipients
+    /// @dev backup recovery if any recipient tries to brick the waterfall for
+    /// remaining recipients
     function waterfallFundsPull() external payable {
         _waterfallFunds(PULL);
     }
@@ -187,10 +191,8 @@ contract WaterfallModule is Clone {
         emit RecoverNonWaterfallFunds(nonWaterfallToken, recipient, amount);
     }
 
-    /**
-     * @notice Withdraw token balance for account `account`
-     * @param account Address to withdraw on behalf of
-     */
+    /// Withdraw token balance for account `account`
+    /// @param account Address to withdraw on behalf of
     function withdraw(address account) external {
         address _token = token();
         uint256 tokenAmount = pullBalances[account];
@@ -212,7 +214,7 @@ contract WaterfallModule is Clone {
     /// functions - view & pure
     /// -----------------------------------------------------------------------
 
-    /// Return tranches in an unpacked form
+    /// Return unpacked tranches
     /// @return recipients Addresses to waterfall payments to
     /// @return thresholds Absolute payment thresholds for waterfall recipients
     function getTranches()
@@ -243,11 +245,9 @@ contract WaterfallModule is Clone {
         recipients[i] = address(uint160(_getTranche(i)));
     }
 
-    /**
-     * @notice Returns the balance for account `account`
-     * @param account Account to return balance for
-     * @return Account's balance waterfall token
-     */
+    /// Returns the balance for account `account`
+    /// @param account Account to return balance for
+    /// @return Account's balance waterfall token
     function getPullBalance(address account) external view returns (uint256) {
         return pullBalances[account];
     }
@@ -263,6 +263,8 @@ contract WaterfallModule is Clone {
     /// functions - private & internal
     /// -----------------------------------------------------------------------
 
+    /// Waterfalls target token inside the contract to next-in-line recipients
+    /// @dev can PUSH or PULL funds to recipients
     function _waterfallFunds(uint256 pullFlowFlag) internal {
         /// checks
 
