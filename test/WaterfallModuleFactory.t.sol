@@ -9,8 +9,6 @@ import {WaterfallModule} from "../src/WaterfallModule.sol";
 import {WaterfallReentrancy} from "./WaterfallReentrancy.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 
-// TODO: use random hash recipients?
-
 contract WaterfallModuleFactoryTest is Test {
     event CreateWaterfallModule(
         address indexed waterfallModule,
