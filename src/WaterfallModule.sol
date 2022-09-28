@@ -190,6 +190,9 @@ contract WaterfallModule is Clone {
             revert InvalidTokenRecovery_WaterfallToken();
         }
 
+        // if nonWaterfallRecipient is set, recipient must match it
+        // else, recipient must be one of the waterfall's recipients
+
         address _nonWaterfallRecipient = nonWaterfallRecipient();
         if (_nonWaterfallRecipient == address(0)) {
             // ensure txn recipient is a valid waterfall recipient
