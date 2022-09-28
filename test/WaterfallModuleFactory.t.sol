@@ -9,10 +9,13 @@ import {WaterfallModule} from "../src/WaterfallModule.sol";
 import {WaterfallReentrancy} from "./WaterfallReentrancy.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 
+// TODO: use random hash recipients?
+
 contract WaterfallModuleFactoryTest is Test {
     event CreateWaterfallModule(
         address indexed waterfallModule,
         address token,
+        address nonWaterfallRecipient,
         address[] trancheRecipient,
         uint256[] trancheThreshold
     );
@@ -22,11 +25,18 @@ contract WaterfallModuleFactoryTest is Test {
     WaterfallModuleFactory wmf;
     MockERC20 mERC20;
 
+    address public nonWaterfallRecipient;
+    address[] public recipients;
+    uint256[] public thresholds;
+
     function setUp() public {
         mERC20 = new MockERC20("Test Token", "TOK", 18);
         mERC20.mint(type(uint256).max);
 
         wmf = new WaterfallModuleFactory();
+
+        nonWaterfallRecipient = makeAddr("nonWaterfallRecipient");
+        (recipients, thresholds) = generateTranches(2);
     }
 
     /// -----------------------------------------------------------------------
@@ -42,33 +52,36 @@ contract WaterfallModuleFactoryTest is Test {
     /// -----------------------------------------------------------------------
 
     function testCan_createWaterfallModules() public {
-        (
-            address[] memory _trancheRecipients,
-            uint256[] memory _trancheThresholds
-        ) = generateTranches(2);
-
         wmf.createWaterfallModule(
-            ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+            ETH_ADDRESS, nonWaterfallRecipient, recipients, thresholds
         );
 
         wmf.createWaterfallModule(
-            address(mERC20), _trancheRecipients, _trancheThresholds
+            address(mERC20), nonWaterfallRecipient, recipients, thresholds
+        );
+
+        nonWaterfallRecipient = address(0);
+        wmf.createWaterfallModule(
+            ETH_ADDRESS, nonWaterfallRecipient, recipients, thresholds
+        );
+
+        wmf.createWaterfallModule(
+            address(mERC20), nonWaterfallRecipient, recipients, thresholds
         );
     }
 
     function testCan_emitOnCreate() public {
-        (
-            address[] memory _trancheRecipients,
-            uint256[] memory _trancheThresholds
-        ) = generateTranches(2);
-
         // don't check deploy address
         vm.expectEmit(false, true, true, true);
         emit CreateWaterfallModule(
-            address(0xdead), ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+            address(0xdead),
+            ETH_ADDRESS,
+            nonWaterfallRecipient,
+            recipients,
+            thresholds
             );
         wmf.createWaterfallModule(
-            ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+            ETH_ADDRESS, nonWaterfallRecipient, recipients, thresholds
         );
 
         // don't check deploy address
@@ -76,40 +89,66 @@ contract WaterfallModuleFactoryTest is Test {
         emit CreateWaterfallModule(
             address(0xdead),
             address(mERC20),
-            _trancheRecipients,
-            _trancheThresholds
+            nonWaterfallRecipient,
+            recipients,
+            thresholds
             );
         wmf.createWaterfallModule(
-            address(mERC20), _trancheRecipients, _trancheThresholds
+            address(mERC20), nonWaterfallRecipient, recipients, thresholds
+        );
+
+        nonWaterfallRecipient = address(0);
+
+        // don't check deploy address
+        vm.expectEmit(false, true, true, true);
+        emit CreateWaterfallModule(
+            address(0xdead),
+            ETH_ADDRESS,
+            nonWaterfallRecipient,
+            recipients,
+            thresholds
+            );
+        wmf.createWaterfallModule(
+            ETH_ADDRESS, nonWaterfallRecipient, recipients, thresholds
+        );
+
+        // don't check deploy address
+        vm.expectEmit(false, true, true, true);
+        emit CreateWaterfallModule(
+            address(0xdead),
+            address(mERC20),
+            nonWaterfallRecipient,
+            recipients,
+            thresholds
+            );
+        wmf.createWaterfallModule(
+            address(mERC20), nonWaterfallRecipient, recipients, thresholds
         );
     }
 
     function testCannot_createWithTooFewRecipients() public {
-        (
-            address[] memory _trancheRecipients,
-            uint256[] memory _trancheThresholds
-        ) = generateTranches(1);
+        (recipients, thresholds) = generateTranches(1);
 
         vm.expectRevert(
             WaterfallModuleFactory.InvalidWaterfall__TooFewRecipients.selector
         );
         wmf.createWaterfallModule(
-            ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+            ETH_ADDRESS, nonWaterfallRecipient, recipients, thresholds
         );
 
-        _trancheRecipients = generateTrancheRecipients(0);
+        recipients = generateTrancheRecipients(0);
 
         vm.expectRevert(
             WaterfallModuleFactory.InvalidWaterfall__TooFewRecipients.selector
         );
         wmf.createWaterfallModule(
-            address(mERC20), _trancheRecipients, _trancheThresholds
+            address(mERC20), nonWaterfallRecipient, recipients, thresholds
         );
     }
 
     function testCannot_createWithMismatchedLengths() public {
-        address[] memory _trancheRecipients = generateTrancheRecipients(2);
-        uint256[] memory _trancheThresholds = generateTrancheThresholds(2);
+        recipients = generateTrancheRecipients(2);
+        thresholds = generateTrancheThresholds(2);
 
         vm.expectRevert(
             WaterfallModuleFactory
@@ -117,11 +156,11 @@ contract WaterfallModuleFactoryTest is Test {
                 .selector
         );
         wmf.createWaterfallModule(
-            ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+            ETH_ADDRESS, nonWaterfallRecipient, recipients, thresholds
         );
 
-        _trancheRecipients = generateTrancheRecipients(3);
-        _trancheThresholds = generateTrancheThresholds(1);
+        recipients = generateTrancheRecipients(3);
+        thresholds = generateTrancheThresholds(1);
 
         vm.expectRevert(
             WaterfallModuleFactory
@@ -129,39 +168,32 @@ contract WaterfallModuleFactoryTest is Test {
                 .selector
         );
         wmf.createWaterfallModule(
-            address(mERC20), _trancheRecipients, _trancheThresholds
+            address(mERC20), nonWaterfallRecipient, recipients, thresholds
         );
     }
 
     function testCannot_createWithZeroThreshold() public {
-        (
-            address[] memory _trancheRecipients,
-            uint256[] memory _trancheThresholds
-        ) = generateTranches(2);
-        _trancheThresholds[0] = 0;
+        thresholds[0] = 0;
 
         vm.expectRevert(
             WaterfallModuleFactory.InvalidWaterfall__ZeroThreshold.selector
         );
         wmf.createWaterfallModule(
-            ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+            ETH_ADDRESS, nonWaterfallRecipient, recipients, thresholds
         );
 
         vm.expectRevert(
             WaterfallModuleFactory.InvalidWaterfall__ZeroThreshold.selector
         );
         wmf.createWaterfallModule(
-            address(mERC20), _trancheRecipients, _trancheThresholds
+            address(mERC20), nonWaterfallRecipient, recipients, thresholds
         );
     }
 
     function testCannot_createWithTooLargeThreshold() public {
-        (
-            address[] memory _trancheRecipients,
-            uint256[] memory _trancheThresholds
-        ) = generateTranches(3);
-        for (uint256 i = 0; i < _trancheThresholds.length; i++) {
-            _trancheThresholds[i] <<= 96;
+        (recipients, thresholds) = generateTranches(3);
+        for (uint256 i = 0; i < thresholds.length; i++) {
+            thresholds[i] <<= 96;
         }
 
         vm.expectRevert(
@@ -173,10 +205,10 @@ contract WaterfallModuleFactoryTest is Test {
             )
         );
         wmf.createWaterfallModule(
-            ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+            ETH_ADDRESS, nonWaterfallRecipient, recipients, thresholds
         );
 
-        _trancheThresholds[0] = 1;
+        thresholds[0] = 1;
         vm.expectRevert(
             abi.encodeWithSelector(
                 WaterfallModuleFactory
@@ -186,17 +218,14 @@ contract WaterfallModuleFactoryTest is Test {
             )
         );
         wmf.createWaterfallModule(
-            address(mERC20), _trancheRecipients, _trancheThresholds
+            address(mERC20), nonWaterfallRecipient, recipients, thresholds
         );
     }
 
     function testCannot_createWithThresholdOutOfOrder() public {
-        (
-            address[] memory _trancheRecipients,
-            uint256[] memory _trancheThresholds
-        ) = generateTranches(4);
-        for (uint256 i = 0; i < _trancheThresholds.length; i++) {
-            _trancheThresholds[i] = (_trancheThresholds.length - i) * 1 ether;
+        (recipients, thresholds) = generateTranches(4);
+        for (uint256 i = 0; i < thresholds.length; i++) {
+            thresholds[i] = (thresholds.length - i) * 1 ether;
         }
 
         vm.expectRevert(
@@ -208,10 +237,10 @@ contract WaterfallModuleFactoryTest is Test {
             )
         );
         wmf.createWaterfallModule(
-            ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+            ETH_ADDRESS, nonWaterfallRecipient, recipients, thresholds
         );
 
-        _trancheThresholds[1] = _trancheThresholds[0];
+        thresholds[1] = thresholds[0];
         vm.expectRevert(
             abi.encodeWithSelector(
                 WaterfallModuleFactory
@@ -221,10 +250,10 @@ contract WaterfallModuleFactoryTest is Test {
             )
         );
         wmf.createWaterfallModule(
-            address(mERC20), _trancheRecipients, _trancheThresholds
+            address(mERC20), nonWaterfallRecipient, recipients, thresholds
         );
 
-        _trancheThresholds[1] = _trancheThresholds[0] + 1;
+        thresholds[1] = thresholds[0] + 1;
         vm.expectRevert(
             abi.encodeWithSelector(
                 WaterfallModuleFactory
@@ -234,7 +263,7 @@ contract WaterfallModuleFactoryTest is Test {
             )
         );
         wmf.createWaterfallModule(
-            ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+            ETH_ADDRESS, nonWaterfallRecipient, recipients, thresholds
         );
     }
 
@@ -242,38 +271,44 @@ contract WaterfallModuleFactoryTest is Test {
     /// correctness tests - fuzzing
     /// -----------------------------------------------------------------------
 
-    function testCan_createWaterfallModules(uint8 _numTranches) public {
+    function testCan_createWaterfallModules(
+        address _nonWaterfallRecipient,
+        uint8 _numTranches
+    ) public {
+        nonWaterfallRecipient = _nonWaterfallRecipient;
         uint256 numTranches = bound(_numTranches, 2, type(uint8).max);
 
-        (
-            address[] memory _trancheRecipients,
-            uint256[] memory _trancheThresholds
-        ) = generateTranches(numTranches);
+        (recipients, thresholds) = generateTranches(numTranches);
 
         wmf.createWaterfallModule(
-            ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+            ETH_ADDRESS, nonWaterfallRecipient, recipients, thresholds
         );
 
         wmf.createWaterfallModule(
-            address(mERC20), _trancheRecipients, _trancheThresholds
+            address(mERC20), nonWaterfallRecipient, recipients, thresholds
         );
     }
 
-    function testCan_emitOnCreate(uint8 _numTranches) public {
+    function testCan_emitOnCreate(
+        address _nonWaterfallRecipient,
+        uint8 _numTranches
+    ) public {
+        nonWaterfallRecipient = _nonWaterfallRecipient;
         uint256 numTranches = bound(_numTranches, 2, type(uint8).max);
 
-        (
-            address[] memory _trancheRecipients,
-            uint256[] memory _trancheThresholds
-        ) = generateTranches(numTranches);
+        (recipients, thresholds) = generateTranches(numTranches);
 
         // don't check deploy address
         vm.expectEmit(false, true, true, true);
         emit CreateWaterfallModule(
-            address(0xdead), ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+            address(0xdead),
+            ETH_ADDRESS,
+            nonWaterfallRecipient,
+            recipients,
+            thresholds
             );
         wmf.createWaterfallModule(
-            ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+            ETH_ADDRESS, nonWaterfallRecipient, recipients, thresholds
         );
 
         // don't check deploy address
@@ -281,11 +316,12 @@ contract WaterfallModuleFactoryTest is Test {
         emit CreateWaterfallModule(
             address(0xdead),
             address(mERC20),
-            _trancheRecipients,
-            _trancheThresholds
+            nonWaterfallRecipient,
+            recipients,
+            thresholds
             );
         wmf.createWaterfallModule(
-            address(mERC20), _trancheRecipients, _trancheThresholds
+            address(mERC20), nonWaterfallRecipient, recipients, thresholds
         );
     }
 
@@ -297,10 +333,8 @@ contract WaterfallModuleFactoryTest is Test {
         vm.assume(_numThresholds >= 1);
         vm.assume(_numRecipients - 1 != _numThresholds);
 
-        address[] memory _trancheRecipients =
-            generateTrancheRecipients(_numRecipients);
-        uint256[] memory _trancheThresholds =
-            generateTrancheThresholds(_numThresholds);
+        recipients = generateTrancheRecipients(_numRecipients);
+        thresholds = generateTrancheThresholds(_numThresholds);
 
         vm.expectRevert(
             WaterfallModuleFactory
@@ -308,7 +342,7 @@ contract WaterfallModuleFactoryTest is Test {
                 .selector
         );
         wmf.createWaterfallModule(
-            ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+            ETH_ADDRESS, nonWaterfallRecipient, recipients, thresholds
         );
 
         vm.expectRevert(
@@ -317,31 +351,28 @@ contract WaterfallModuleFactoryTest is Test {
                 .selector
         );
         wmf.createWaterfallModule(
-            address(mERC20), _trancheRecipients, _trancheThresholds
+            address(mERC20), nonWaterfallRecipient, recipients, thresholds
         );
     }
 
     function testCannot_createWithZeroThreshold(uint8 _numTranches) public {
         uint256 numTranches = bound(_numTranches, 2, type(uint8).max);
 
-        (
-            address[] memory _trancheRecipients,
-            uint256[] memory _trancheThresholds
-        ) = generateTranches(numTranches);
-        _trancheThresholds[0] = 0;
+        (recipients, thresholds) = generateTranches(numTranches);
+        thresholds[0] = 0;
 
         vm.expectRevert(
             WaterfallModuleFactory.InvalidWaterfall__ZeroThreshold.selector
         );
         wmf.createWaterfallModule(
-            ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+            ETH_ADDRESS, nonWaterfallRecipient, recipients, thresholds
         );
 
         vm.expectRevert(
             WaterfallModuleFactory.InvalidWaterfall__ZeroThreshold.selector
         );
         wmf.createWaterfallModule(
-            address(mERC20), _trancheRecipients, _trancheThresholds
+            address(mERC20), nonWaterfallRecipient, recipients, thresholds
         );
     }
 
@@ -356,12 +387,9 @@ contract WaterfallModuleFactoryTest is Test {
         vm.assume(_largeThreshold > 0);
         uint256 largeThreshold = uint256(_largeThreshold) << 96;
 
-        (
-            address[] memory _trancheRecipients,
-            uint256[] memory _trancheThresholds
-        ) = generateTranches(numTranches);
+        (recipients, thresholds) = generateTranches(numTranches);
 
-        _trancheThresholds[largeThresholdIndex] = largeThreshold;
+        thresholds[largeThresholdIndex] = largeThreshold;
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -372,7 +400,7 @@ contract WaterfallModuleFactoryTest is Test {
             )
         );
         wmf.createWaterfallModule(
-            ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+            ETH_ADDRESS, nonWaterfallRecipient, recipients, thresholds
         );
 
         vm.expectRevert(
@@ -384,7 +412,7 @@ contract WaterfallModuleFactoryTest is Test {
             )
         );
         wmf.createWaterfallModule(
-            address(mERC20), _trancheRecipients, _trancheThresholds
+            address(mERC20), nonWaterfallRecipient, recipients, thresholds
         );
     }
 
@@ -395,13 +423,10 @@ contract WaterfallModuleFactoryTest is Test {
         uint256 numTranches = bound(_numTranches, 3, type(uint8).max);
         uint256 swapIndex = bound(_swapIndex, 1, numTranches - 2);
 
-        (
-            address[] memory _trancheRecipients,
-            uint256[] memory _trancheThresholds
-        ) = generateTranches(numTranches);
+        (recipients, thresholds) = generateTranches(numTranches);
 
-        (_trancheThresholds[swapIndex], _trancheThresholds[swapIndex - 1]) =
-            (_trancheThresholds[swapIndex - 1], _trancheThresholds[swapIndex]);
+        (thresholds[swapIndex], thresholds[swapIndex - 1]) =
+            (thresholds[swapIndex - 1], thresholds[swapIndex]);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -412,7 +437,7 @@ contract WaterfallModuleFactoryTest is Test {
             )
         );
         wmf.createWaterfallModule(
-            ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+            ETH_ADDRESS, nonWaterfallRecipient, recipients, thresholds
         );
 
         vm.expectRevert(
@@ -424,12 +449,12 @@ contract WaterfallModuleFactoryTest is Test {
             )
         );
         wmf.createWaterfallModule(
-            address(mERC20), _trancheRecipients, _trancheThresholds
+            address(mERC20), nonWaterfallRecipient, recipients, thresholds
         );
 
         /// test equal thresholds
 
-        _trancheThresholds[swapIndex - 1] = _trancheThresholds[swapIndex];
+        thresholds[swapIndex - 1] = thresholds[swapIndex];
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -440,7 +465,7 @@ contract WaterfallModuleFactoryTest is Test {
             )
         );
         wmf.createWaterfallModule(
-            ETH_ADDRESS, _trancheRecipients, _trancheThresholds
+            ETH_ADDRESS, nonWaterfallRecipient, recipients, thresholds
         );
 
         vm.expectRevert(
@@ -452,7 +477,7 @@ contract WaterfallModuleFactoryTest is Test {
             )
         );
         wmf.createWaterfallModule(
-            address(mERC20), _trancheRecipients, _trancheThresholds
+            address(mERC20), nonWaterfallRecipient, recipients, thresholds
         );
     }
 
@@ -463,31 +488,31 @@ contract WaterfallModuleFactoryTest is Test {
     function generateTranches(uint256 numTranches)
         internal
         pure
-        returns (address[] memory recipients, uint256[] memory thresholds)
+        returns (address[] memory _recipients, uint256[] memory _thresholds)
     {
-        recipients = generateTrancheRecipients(numTranches);
-        thresholds = generateTrancheThresholds(numTranches - 1);
+        _recipients = generateTrancheRecipients(numTranches);
+        _thresholds = generateTrancheThresholds(numTranches - 1);
     }
 
     function generateTrancheRecipients(uint256 numRecipients)
         internal
         pure
-        returns (address[] memory recipients)
+        returns (address[] memory _recipients)
     {
-        recipients = new address[](numRecipients);
+        _recipients = new address[](numRecipients);
         for (uint256 i = 0; i < numRecipients; i++) {
-            recipients[i] = address(uint160(i));
+            _recipients[i] = address(uint160(i));
         }
     }
 
     function generateTrancheThresholds(uint256 numThresholds)
         internal
         pure
-        returns (uint256[] memory thresholds)
+        returns (uint256[] memory _thresholds)
     {
-        thresholds = new uint256[](numThresholds);
+        _thresholds = new uint256[](numThresholds);
         for (uint256 i = 0; i < numThresholds; i++) {
-            thresholds[i] = (i + 1) * 1 ether;
+            _thresholds[i] = (i + 1) * 1 ether;
         }
     }
 }

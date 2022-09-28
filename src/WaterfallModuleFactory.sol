@@ -44,12 +44,14 @@ contract WaterfallModuleFactory {
     /// Emitted after a new waterfall module is deployed
     /// @param waterfallModule Address of newly created WaterfallModule clone
     /// @param token Address of ERC20 to waterfall (0x0 used for ETH)
+    /// @param nonWaterfallRecipient Address to recover non-waterfall tokens to
     /// @param recipients Addresses to waterfall payments to
     /// @param thresholds Absolute payment thresholds for waterfall recipients
     /// (last recipient has no threshold & receives all residual flows)
     event CreateWaterfallModule(
         address indexed waterfallModule,
         address token,
+        address nonWaterfallRecipient,
         address[] recipients,
         uint256[] thresholds
     );
@@ -81,12 +83,14 @@ contract WaterfallModuleFactory {
 
     /// Create a new WaterfallModule clone
     /// @param token Address of ERC20 to waterfall (0x0 used for ETH)
+    /// @param nonWaterfallRecipient Address to recover non-waterfall tokens to
     /// @param recipients Addresses to waterfall payments to
     /// @param thresholds Absolute payment thresholds for waterfall recipients
     /// (last recipient has no threshold & receives all residual flows)
     /// @return wm Address of new WaterfallModule clone
     function createWaterfallModule(
         address token,
+        address nonWaterfallRecipient,
         address[] calldata recipients,
         uint256[] calldata thresholds
     ) external returns (WaterfallModule wm) {
@@ -149,9 +153,12 @@ contract WaterfallModuleFactory {
 
         // recipientsLength won't realistically be > 2^64; deployed contract
         // would exceed contract size limits
-        bytes memory data =
-            abi.encodePacked(token, uint64(recipientsLength), tranches);
+        bytes memory data = abi.encodePacked(
+            token, nonWaterfallRecipient, uint64(recipientsLength), tranches
+        );
         wm = WaterfallModule(address(wmImpl).clone(data));
-        emit CreateWaterfallModule(address(wm), token, recipients, thresholds);
+        emit CreateWaterfallModule(
+            address(wm), token, nonWaterfallRecipient, recipients, thresholds
+            );
     }
 }

@@ -28,7 +28,7 @@ contract WaterfallModule is Clone {
     /// Invalid token recovery; cannot recover the waterfall token
     error InvalidTokenRecovery_WaterfallToken();
 
-    /// Invalid token recovery recipient; not a waterfall recipient
+    /// Invalid token recovery recipient
     error InvalidTokenRecovery_InvalidRecipient();
 
     /// Invalid distribution
@@ -68,6 +68,10 @@ contract WaterfallModule is Clone {
     /// storage
     /// -----------------------------------------------------------------------
 
+    /// -----------------------------------------------------------------------
+    /// storage - constants
+    /// -----------------------------------------------------------------------
+
     address internal constant ETH_ADDRESS = address(0);
 
     uint256 internal constant PUSH = 0;
@@ -78,15 +82,32 @@ contract WaterfallModule is Clone {
     uint256 internal constant ADDRESS_BITS = 160;
     uint256 internal constant ADDRESS_BITMASK = uint256(~0 >> THRESHOLD_BITS);
 
-    // 20 = address (20 bytes)
-    uint256 internal constant NUM_TRANCHES_OFFSET = 20;
-    // 28 = NUM_TRANCHES_OFFSET (20) + uint64 (8 bytes)
-    uint256 internal constant TRANCHES_OFFSET = 28;
+    /// -----------------------------------------------------------------------
+    /// storage - cwia offsets
+    /// -----------------------------------------------------------------------
+
+    // token (address, 20 bytes), nonWaterfallRecipient (address, 20 bytes),
+    // numTranches (uint64, 8 bytes), tranches (uint256[], numTranches * 32 bytes)
+
+    // 0; first item
+    uint256 internal constant TOKEN_OFFSET = 0;
+    // 20 = token_offset (0) + token_size (address, 20 bytes)
+    uint256 internal constant NON_WATERFALL_RECIPIENT_OFFSET = 20;
+    // 40 = nonWaterfallRecipient_offset (20) + nonWaterfallRecipient_size (address, 20 bytes)
+    uint256 internal constant NUM_TRANCHES_OFFSET = 40;
+    // 48 = numTranches_offset (40) + numTranches_size (uint64, 8 bytes)
+    uint256 internal constant TRANCHES_OFFSET = 48;
 
     /// Address of ERC20 to waterfall (0x0 used for ETH)
     /// @dev equivalent to address public immutable token;
     function token() public pure returns (address) {
-        return _getArgAddress(0);
+        return _getArgAddress(TOKEN_OFFSET);
+    }
+
+    /// Address to recover non-waterfall tokens to
+    /// @dev equivalent to address public immutable nonWaterfallRecipient;
+    function nonWaterfallRecipient() public pure returns (address) {
+        return _getArgAddress(NON_WATERFALL_RECIPIENT_OFFSET);
     }
 
     /// Number of waterfall tranches
@@ -95,6 +116,19 @@ contract WaterfallModule is Clone {
     function numTranches() internal pure returns (uint256) {
         return uint256(_getArgUint64(NUM_TRANCHES_OFFSET));
     }
+
+    /// Get waterfall tranche `i`
+    /// @dev emulates to uint256[] internal immutable tranche;
+    function _getTranche(uint256 i) internal pure returns (uint256) {
+        unchecked {
+            // shouldn't overflow
+            return _getArgUint256(TRANCHES_OFFSET + i * ONE_WORD);
+        }
+    }
+
+    /// -----------------------------------------------------------------------
+    /// storage - mutables
+    /// -----------------------------------------------------------------------
 
     /// Amount of distributed waterfall token
     /// @dev ERC20s with very large decimals may overflow & cause issues
@@ -156,21 +190,26 @@ contract WaterfallModule is Clone {
             revert InvalidTokenRecovery_WaterfallToken();
         }
 
-        // ensure txn recipient is a valid waterfall recipient
-        (address[] memory recipients,) = getTranches();
-        bool validRecipient = false;
-        uint256 _numTranches = numTranches();
-        for (uint256 i; i < _numTranches;) {
-            if (recipients[i] == recipient) {
-                validRecipient = true;
-                break;
+        address _nonWaterfallRecipient = nonWaterfallRecipient();
+        if (_nonWaterfallRecipient == address(0)) {
+            // ensure txn recipient is a valid waterfall recipient
+            (address[] memory recipients,) = getTranches();
+            bool validRecipient = false;
+            uint256 _numTranches = numTranches();
+            for (uint256 i; i < _numTranches;) {
+                if (recipients[i] == recipient) {
+                    validRecipient = true;
+                    break;
+                }
+                unchecked {
+                    // shouldn't overflow
+                    ++i;
+                }
             }
-            unchecked {
-                // shouldn't overflow
-                ++i;
+            if (!validRecipient) {
+                revert InvalidTokenRecovery_InvalidRecipient();
             }
-        }
-        if (!validRecipient) {
+        } else if (recipient != _nonWaterfallRecipient) {
             revert InvalidTokenRecovery_InvalidRecipient();
         }
 
@@ -250,13 +289,6 @@ contract WaterfallModule is Clone {
     /// @return Account's balance waterfall token
     function getPullBalance(address account) external view returns (uint256) {
         return pullBalances[account];
-    }
-
-    function _getTranche(uint256 i) internal pure returns (uint256) {
-        unchecked {
-            // shouldn't overflow
-            return _getArgUint256(TRANCHES_OFFSET + i * ONE_WORD);
-        }
     }
 
     /// -----------------------------------------------------------------------
