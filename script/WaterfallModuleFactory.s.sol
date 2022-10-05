@@ -2,7 +2,7 @@
 pragma solidity ^0.8.17;
 
 import "forge-std/Script.sol";
-import {WaterfallModuleFactory} from "../src/WaterfallModuleFactory.sol";
+import {WaterfallModuleFactory} from "src/WaterfallModuleFactory.sol";
 
 contract WaterfallModuleFactoryScript is Script {
     function run() external {
