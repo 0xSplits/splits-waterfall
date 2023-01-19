@@ -65,3 +65,5 @@ gnosis = { key = "${GNO_ETHERSCAN_API_KEY}", url = "https://api.gnosisscan.io/ap
 chiado = { key = "${GNO_ETHERSCAN_API_KEY}", url = "https://blockscout.com/gnosis/chiado/api" }
 fantom = { key = "${FTM_ETHERSCAN_API_KEY}" }
 fantomTestnet = { key = "${FTM_ETHERSCAN_API_KEY}" }
+avalanche = { key = "${AVAX_ETHERSCAN_API_KEY}" }
+avalancheFuji = { key = "${AVAX_ETHERSCAN_API_KEY}" }
