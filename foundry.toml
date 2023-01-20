@@ -67,3 +67,7 @@ fantom = { key = "${FTM_ETHERSCAN_API_KEY}" }
 fantomTestnet = { key = "${FTM_ETHERSCAN_API_KEY}" }
 avalanche = { key = "${AVAX_ETHERSCAN_API_KEY}" }
 avalancheFuji = { key = "${AVAX_ETHERSCAN_API_KEY}" }
+aurora = { key = "${AURORA_ETHERSCAN_API_KEY}" }
+auroraTestnet = { key = "${AURORA_ETHERSCAN_API_KEY}" }
+bsc = { key = "${BSC_ETHERSCAN_API_KEY}" }
+bscTestnet = { key = "${BSC_ETHERSCAN_API_KEY}" }
