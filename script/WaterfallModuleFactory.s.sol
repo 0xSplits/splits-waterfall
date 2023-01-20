@@ -9,7 +9,7 @@ contract WaterfallModuleFactoryScript is Script {
         uint256 privKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(privKey);
 
-        new WaterfallModuleFactory{salt: keccak256("0xSplits.waterfall.v1")}();
+        new WaterfallModuleFactory{salt: keccak256("0xSplits.bsc.waterfall.v1")}();
 
         vm.stopBroadcast();
     }
