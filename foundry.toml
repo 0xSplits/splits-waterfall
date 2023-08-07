@@ -72,3 +72,4 @@ auroraTestnet = { key = "${AURORA_ETHERSCAN_API_KEY}" }
 bsc = { key = "${BSC_ETHERSCAN_API_KEY}" }
 bscTestnet = { key = "${BSC_ETHERSCAN_API_KEY}" }
 zora = { key = "${ZORA_ETHERSCAN_API_KEY}", url = "https://explorer.zora.energy/api" }
+base = { key = "${BASE_ETHERSCAN_API_KEY}", url = "https://api.basescan.org/api" }
