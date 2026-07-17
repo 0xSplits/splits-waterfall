@@ -1,5 +1,7 @@
 # splits-waterfall
 
+Waterfall contracts for the [Splits protocol](https://splits.org/protocol/). Try it today at [explorer.splits.org/new/waterfall](https://explorer.splits.org/new/waterfall/).
+
 [Docs](https://splits.org/protocol/docs/core/waterfall)
 
 Install [foundry](https://github.com/foundry-rs/foundry#installation), then run `forge install` and `forge build` to compile the contracts.
